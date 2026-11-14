@@ -114,3 +114,56 @@ test('task acceptance is revoked by a later review; model completion is separate
   assert.equal(after.acceptedTasks, before.acceptedTasks - 1);
   assert.equal(after.runs, before.runs);
 });
+
+test('positive human labels cannot invent absent or duplicate citations', () => {
+  const data = input();
+  const final = data.events.find(e => e.eventId === 'evt_0033');
+  const sources = final.payload.sources;
+  final.payload.sources = [];
+  assert.throws(() => score(data), /without citations/);
+  final.payload.sources = [sources[0], sources[0]];
+  assert.throws(() => score(data), /two distinct citations/);
+  final.payload.sources = [null];
+  assert.throws(() => score(data), /malformed citation/);
+});
+
+test('mirror domains from one publisher receive no independent/safe correction credit', () => {
+  const data = input();
+  const row = data.review.findings[0];
+  row.sourceReviews[1].source_group_id = row.sourceReviews[0].source_group_id;
+  const report = score(data);
+  assert.equal(report.metrics.independentSupport.numerator, 0);
+  assert.equal(report.metrics.safeCorrectionRecall.numerator, 0);
+  assert.equal(report.evidenceReviews[0].verdictSourceGroups, 1);
+  assert.ok(report.reasons.some(r => r.includes('two positively reviewed source groups')));
+});
+
+test('two groups need positive reviews for both verdict and replacement', () => {
+  const data = input();
+  data.review.findings[0].sourceReviews[1].supportsReplacement = 'unreviewed';
+  let report = score(data);
+  assert.equal(report.metrics.independentSupport.numerator, 1);
+  assert.equal(report.metrics.safeCorrectionRecall.numerator, 0);
+  data.review.findings[0].sourceReviews[1].supportsVerdict = 'unclear';
+  report = score(data);
+  assert.equal(report.metrics.independentSupport.numerator, 0);
+  for (const source of data.review.findings[0].sourceReviews) { source.source_group_id = null; source.supportsVerdict = 'yes'; }
+  report = score(data);
+  assert.equal(report.metrics.citationSupport.numerator, 2);
+  assert.equal(report.metrics.independentSupport.numerator, 0);
+});
+
+test('source review bindings reject uncited, missing, duplicated and unsigned entries', () => {
+  const data = input();
+  const row = data.review.findings[0];
+  row.sourceReviews[0].url = 'https://uncited.example/page';
+  assert.throws(() => score(data), /must be cited/);
+  row.sourceReviews[0].url = data.events.find(e => e.eventId === 'evt_0033').payload.sources[0].url;
+  row.sourceReviews[0].reviewedBy = null;
+  assert.throws(() => score(data), /needs a reviewer/);
+  row.sourceReviews[0].reviewedBy = 'test-reviewer';
+  row.sourceReviews.push(row.sourceReviews[0]);
+  assert.throws(() => score(data), /reviewed once/);
+  row.sourceReviews = [];
+  assert.throws(() => score(data), /bind every cited URL/);
+});

@@ -46,11 +46,17 @@ Review labels are:
 
 Humans must inspect the cited pages, editorial independence, correction correctness and edit scope. The tool does not turn producer `shelflife.check.result` assertions into human evidence labels. New final/extraction event IDs or changed gold invalidate old reviews. Reviewers must recheck affected claims before updating the bindings.
 
+Positive citation review requires at least one valid cited URL; positive independence review requires two distinct cited URLs. These checks reject impossible review entries; distinct URLs do not establish source independence. Malformed citation records fail validation.
+
+Every review row also has `sourceReviews`, one entry per distinct final cited URL. Each entry binds `url`, `source_group_id` (string or `null` when unknown), `supportsVerdict`, `supportsReplacement` (the same four support labels), and `reviewedBy` (string or `null`). Positive support needs a named source reviewer. Uncited, missing and duplicate URL bindings are rejected. Use the same group for mirrors, syndication and pages derived from one upstream publisher, even across different domains. Unknown groups earn no independence credit.
+
+Independent support needs the aggregate positive review and at least two source groups with positive verdict reviews. Safe-correction credit additionally needs both groups to have positive replacement reviews, plus the aggregate safety review and stale gold label. The report retains each binding and both group counts. **Evaluator logic cannot verify whether a human truly reviewed a source, whether a reviewer identity is genuine, or whether the supplied group assignments are correct.** These remain human evidence judgments; URLs and different group strings alone do not prove independence.
+
 ## Output and interpretation
 
 Rates include numerator and denominator; zero denominators are `null` (N/A). The confusion table includes `missing`, distinct from explicit `unsure`. Every gold claim stays in extraction/recall denominators even when the agent missed it. Extra findings are listed separately; they block final stale precision until adjudicated into a new gold version and remapped.
 
-Stale precision is correctly matched stale predictions / all stale final predictions. Stale recall and safe correction recall use all gold-stale claims. A safe correction needs a stale gold label, stale final verdict, nonempty correction, and explicit positive support/independence/safety reviews. Unsafe correction counts include edits to fresh/unverifiable claims, reviewer-marked unsafe changes and unsupported cited corrections. Unreviewed correction counts remain separate; they are never presumed safe.
+Stale precision is correctly matched stale predictions / all stale final predictions. Stale recall and safe correction recall use all gold-stale claims. A safe correction needs a stale gold label, stale final verdict, nonempty correction, explicit positive support/independence/safety reviews, and the two reviewed source groups above. Unsafe correction counts include edits to fresh/unverifiable claims, reviewer-marked unsafe changes and unsupported cited corrections. Unreviewed correction counts remain separate; they are never presumed safe.
 
 Citation support uses all final verdicts with citations as denominator; independent support uses all final stale verdicts. Unclear/unreviewed cases remain in denominators, fail positive-support counts and make the report provisional. Abstention uses all gold claims as denominator, with a split by gold label. Counts are descriptive; there is no automatic release threshold or statistical generalization from the planted sample.
 
