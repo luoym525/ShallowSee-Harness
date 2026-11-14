@@ -2,7 +2,15 @@
 
 *14 November 2026, Europe/London. Discussion snapshot, not a declaration that the product is implemented or the team has approved every proposal. Companion to [the architecture plan](shallowsee-design-plan.md).*
 
-## Latest user decision — 14:13–14:14
+## Latest user decision — wish-driven software production
+
+The user's latest clarification restores **ShallowSee Harness for 许愿式编程** as the product: interpret the user's current intent and coordinate distinct presales, planning, project-manager, development, testing and after-sales agents through the software-production lifecycle. Assign different model configurations by role to control cost. Only presales, planning and project-manager roles may use search APIs to research mature industrial solutions and verify freshness and accuracy.
+
+The user confirms a versioned proposal before it goes to a coding agent. After development, the project manager supplies a usage guide and the tester verifies the delivered candidate. Failed tests feed development revisions; after-sales continues from the delivered version. The target architecture and implementation gaps are recorded in [docs/WISH-CODING.md](docs/WISH-CODING.md).
+
+This product direction supersedes the older Shelf Life-only scope below. Existing code remains predominantly Shelf Life; this update does not claim that general routing, role-specific models or the production lifecycle have been implemented. Earlier process or ownership notes cannot override this latest user-defined product scope.
+
+## Historical user decision — 14:13–14:14 (superseded scope)
 
 The user has selected **Fable's Shelf Life fact-checking workflow as the immediate product**. The general collaboration platform and local router are deferred. The user explicitly authorized implementation and Git pushes, replacing the earlier design-only limit.
 
@@ -10,7 +18,7 @@ For project decisions, Fable's judgment resolves disagreements with the Codex co
 
 The Codex implementation now focuses on a local event-log service and workbench showing the workflow, findings with sources, reliability evidence, and clearly labeled replay. Fable owns the workflow and shared contract. Final repository paths and integration details are coordinated in the meeting.
 
-The earlier platform scaffold has been preserved separately and is not the active product. The local-router experiment below remains a preliminary record for the deferred work. The remaining sections describe the earlier discussion snapshot; where they differ, this update takes precedence.
+At that earlier point the platform scaffold was preserved separately and the local router was deferred. The remaining sections preserve the earlier discussion snapshot; the latest wish-driven product definition above takes precedence where they differ.
 
 ## Outline
 
