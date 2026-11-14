@@ -247,6 +247,23 @@ function runCard(run, audit) {
   return card;
 }
 function renderFindings(audit) {
+  const outcome = $('findings-outcome'); outcome.replaceChildren();
+  const patchArtifacts = (audit.artifacts || []).filter(a => a.kind === 'patch' && safeUrl(a.location));
+  for (const pr of audit.prs) {
+    const row = node('div', 'pr-link pr-banner');
+    const left = add(node('div', 'pr-banner-main'), label('Pull request', 'teal'), externalLink(`${pr.repo || 'Repository'} · PR #${pr.number ?? '?'} ↗`, pr.url));
+    const meta = [pr.branch, pr.commit ? pr.commit.slice(0, 7) : null, pr.claimIds?.length ? `${pr.claimIds.length} claim${pr.claimIds.length === 1 ? '' : 's'}` : null].filter(Boolean).join(' · ');
+    add(row, left, node('small', '', meta || 'Commit unknown'));
+    add(outcome, row);
+  }
+  if (!audit.prs.length) {
+    for (const art of patchArtifacts) {
+      const row = node('div', 'pr-link pr-banner');
+      const left = add(node('div', 'pr-banner-main'), label('Branch pushed', 'gold'), externalLink('Compare patch branch ↗', art.location));
+      add(row, left, node('small', '', art.version ? `Commit ${art.version.slice(0, 7)}` : 'No PR opened'));
+      add(outcome, row);
+    }
+  }
   const container = $('findings'); container.replaceChildren();
   if (!audit.claims.length) add(container, empty('No claims extracted yet', 'The workflow’s exact quotes, final verdicts and cited sources will appear here.'));
   for (const claim of audit.claims) {
@@ -254,6 +271,15 @@ function renderFindings(audit) {
     const status = { stale: ['Outdated', 'orange'], fresh: ['Current', 'teal'], unsure: ['Needs human review', 'gold'], pending: ['Awaiting final verdict', 'gray'] }[verdict] || ['Unrecognized verdict', 'gray'];
     const card = node('article', 'card finding');
     add(card, add(node('div', 'card-heading'), node('span', 'eyebrow', `${human(claim.category || 'fact')} / ${claim.id}`), label(status[0], status[1])), node('h3', '', claim.statement || claim.quote || claim.id), node('p', 'finding-meta', `${claim.doc || 'Document unknown'}${claim.lineStart ? `:${claim.lineStart}${claim.lineEnd !== claim.lineStart ? `–${claim.lineEnd}` : ''}` : ''}`));
+    if (verdict === 'stale') {
+      const shift = node('div', 'value-shift stale');
+      add(shift, node('span', 'value-tag', 'Old'), node('code', 'value-old', claim.oldValue || 'Outdated'), node('span', 'value-arrow', '→'), node('span', 'value-tag', 'New'), node('code', 'value-new', conclusion?.currentValue || 'Needs replacement'));
+      add(card, shift);
+    } else if (verdict === 'fresh' || verdict === 'unsure') {
+      const shift = node('div', `value-shift ${verdict}`);
+      add(shift, node('span', 'value-tag', 'Value'), node('code', 'value-keep', claim.oldValue || conclusion?.currentValue || 'Recorded'), node('span', 'value-note', verdict === 'fresh' ? 'Confirmed current' : 'Left unchanged · needs human review'));
+      add(card, shift);
+    }
     const comparisons = node('div', 'comparison');
     add(comparisons, add(node('div', 'quote'), node('label', '', 'Document says'), document.createTextNode(claim.quote || 'No exact quote recorded.')));
     const after = verdict === 'stale' ? conclusion.correction || 'No supported replacement recorded.' : verdict === 'fresh' ? conclusion.currentValue || claim.quote || 'Recorded as current.' : verdict === 'unsure' ? 'Keep the document unchanged until a person resolves the evidence.' : claim.proposed ? `Proposed ${human(claim.proposed.verdict)} — awaiting a final decision.` : 'Verification is still pending.';
@@ -271,6 +297,17 @@ function renderFindings(audit) {
       add(card, list);
     } else add(card, node('p', 'muted small', 'No source evidence recorded for this conclusion yet.'));
     if (claim.checks.length || claim.searches.length) {
+      const latestByCheck = new Map();
+      for (const check of claim.checks) latestByCheck.set(check.check, check);
+      if (latestByCheck.size) {
+        const strip = node('div', 'check-strip');
+        for (const check of latestByCheck.values()) {
+          const cls = check.passed === true ? 'pass' : check.passed === false ? 'fail' : 'muted';
+          const mark = check.passed === true ? '✓' : check.passed === false ? '!' : '?';
+          add(strip, node('span', `check-pill ${cls}`, `${mark} ${human(check.check)}`));
+        }
+        add(card, strip);
+      }
       const checks = node('details', 'check-list');
       const failures = claim.checks.filter(check => check.passed === false).length;
       add(checks, node('summary', '', `${claim.searches.length} searches · ${claim.checks.length} recorded checks${failures ? ` · ${failures} failed before or during review` : ''}`));

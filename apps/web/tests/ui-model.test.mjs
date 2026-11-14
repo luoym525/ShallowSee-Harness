@@ -188,3 +188,14 @@ test('message author prefers explicit author then normalized provenance then Sys
   assert.equal(messages[3].provenance.memberId, null);
   assert.equal(messageAuthor(null, model.members), 'System');
 });
+
+test('extracted oldValue and registered artifacts are retained for findings view', () => {
+  const model = buildAudit([
+    event(1, 'shelflife.claim.extracted', { claimId: 'c1', doc: 'handbook/a.md', lineStart: 5, lineEnd: 5, quote: 'Python 3.11.', statement: 'Latest Python', category: 'version', oldValue: '3.11' }),
+    event(2, 'shelflife.verdict.final', { claimId: 'c1', verdict: 'stale', currentValue: '3.15', correction: 'Python 3.15.', rationale: 'Updated', sources: [] }),
+    event(3, 'artifact.registered', { artifactId: 'branch_1234', kind: 'patch', location: 'https://github.com/acme/repo/compare/main...shelf-life/a', version: '1234567890abcdef' }),
+  ]);
+  assert.equal(model.claims[0].oldValue, '3.11');
+  assert.equal(model.claims[0].final.currentValue, '3.15');
+  assert.deepEqual(model.artifacts, [{ artifactId: 'branch_1234', kind: 'patch', location: 'https://github.com/acme/repo/compare/main...shelf-life/a', version: '1234567890abcdef' }]);
+});
