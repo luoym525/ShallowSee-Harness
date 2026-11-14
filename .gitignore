@@ -25,3 +25,7 @@ __pycache__/
 Thumbs.db
 .idea/
 .vscode/
+
+# Harness API keys: copy apiConfig.example.json to apiConfig.json (or use the Setup page).
+apiConfig.json
+config.yaml
