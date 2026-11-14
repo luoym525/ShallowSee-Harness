@@ -77,3 +77,23 @@ test('a draft becomes scoreable only after explicit fixture review fields are fi
   assert.equal(report.publishable, false);
   assert.equal(report.synthetic, true);
 });
+
+test('empty/no-claim inputs fail and preparing never mutates input bytes or gold', () => {
+  const beforeLog = Buffer.from(log);
+  const beforeGold = structuredClone(gold);
+  prepareReview(log, gold);
+  assert.deepEqual(log, beforeLog);
+  assert.deepEqual(gold, beforeGold);
+  assert.throws(() => prepareReview('', gold), /No committed events/);
+  assert.throws(() => prepareReview(encode(events().slice(0, 1)), gold), /No extracted claims/);
+});
+
+test('new extraction bindings supersede prior IDs without matching to gold', () => {
+  const data = events();
+  const extraction = structuredClone(data.find(e => e.eventId === 'evt_0017'));
+  Object.assign(extraction, { eventId: 'new-extraction', seq: data.length + 1, timestamp: data.at(-1).timestamp });
+  data.push(extraction);
+  const row = prepareReview(encode(data), gold).findings[0];
+  assert.equal(row.extractedEventId, 'new-extraction');
+  assert.equal(row.goldId, null);
+});

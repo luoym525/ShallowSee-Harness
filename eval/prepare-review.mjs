@@ -33,6 +33,7 @@ export function prepareReview(logBytes, gold) {
     }
     claims.set(claimId, claim);
   }
+  if (!claims.size) throw new Error('No extracted claims to prepare; an empty draft is not a completed review.');
   const findings = [...claims.values()].map(claim => {
     if (!claim.extractedEventId) throw new Error(`Final verdict ${claim.claimId} has no extracted claim.`);
     return { claimId: claim.claimId, goldId: null, extractedEventId: claim.extractedEventId, finalEventId: claim.finalEventId,
