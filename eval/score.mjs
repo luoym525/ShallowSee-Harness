@@ -23,7 +23,7 @@ const reviewedGroups = (review, replacement = false) => new Set((review?.sourceR
   .filter(s => text(s.source_group_id) && text(s.reviewedBy) && s.supportsVerdict === 'yes' && (!replacement || s.supportsReplacement === 'yes'))
   .map(s => s.source_group_id)).size;
 
-function validateGold(gold) {
+export function validateGold(gold) {
   requireValue(object(gold) && gold.schemaVersion === 1, 'Gold schemaVersion must be 1.');
   requireValue(text(gold.datasetVersion) && text(gold.handbookRef) && typeof gold.synthetic === 'boolean', 'Gold needs datasetVersion, handbookRef and explicit synthetic flag.');
   requireValue(Array.isArray(gold.claims) && gold.claims.length > 0, 'Gold claims must be a nonempty array.');
