@@ -4,7 +4,13 @@ ShallowSee 的产品目标是：用户提出想法，Harness 根据用户当前�
 
 默认流程是：**需求澄清 → 方案规划 → 用户确认方案 → 编程 Agent 开发 → 项目经理编写使用说明 → 独立测试与返工 → 交付与售后**。完整职责、意图路由、模型策略、权限和实施顺序见 [许愿式编程产品与架构定义](docs/WISH-CODING.md)。这是最新用户目标，取代旧文档中 Shelf Life 优先、通用 Harness 后置的范围说明。
 
-**当前实现仍以 Shelf Life 文档核查为主**：已有本地日志、只读工作台、特定审计流程和离线评测，尚未实现上面的完整岗位调度与生产闭环。下面的启动方法用于查看现有工作台；Shelf Life 作为已有核查能力和历史演示保留。
+**Shelf Life 是规划／项目经理的研究与时效核查 skill**：目标是主动寻找最新相关工业方案，核实版本、准确性、维护状态与实际生产实践，把带来源和核实时间的报告交回原岗位。[可复用 skill 指令](skills/shelf-life/SKILL.md)已接入演示中的规划研究任务；当前实现使用搜索结果并绑定方案摘要与来源 URL，完整的[报告契约](skills/shelf-life/references/report.md)、原文核查和时效重查仍需扩展。
+
+**当前已有小型多岗位 Harness 演示**：包含本项目自己的 Agent 工具循环、岗位权限、方案确认、开发、项目经理说明、独立测试和有上限的返工。模型与搜索可注入，Claude 用作测试供应商适配。完整工业生产平台、运行恢复与售后交互仍未实现。下方也保留原 Shelf Life 工作台与审计功能。
+
+一个早期 Harness 合成演示可通过 `node packages/harness/demo.mjs` 运行。它使用模拟的模型、研究结果和用户确认，生成并测试一个本地示例程序；不调用真实模型或搜索。事件记录可在工作台查看。该演示尚未实现真实模型适配、Shelf Life 调度或服务重启后的任务恢复。
+
+新增的多岗位演示入口是 `node packages/harness/run.mjs --synthetic`，使用本项目自己的 Agent 执行循环、Shelf Life 研究任务和独立测试岗。Claude 测试适配、按岗位选择模型以及交互式方案确认的使用方法和限制见 [Harness demo guide](docs/HARNESS-DEMO.md)。真实供应商链路仍需单独验证。
 
 ## Run the workbench
 

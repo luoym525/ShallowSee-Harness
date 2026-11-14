@@ -1,5 +1,7 @@
 # Shelf Life direct audit
 
+> Current Harness role: Shelf Life is a [research and freshness skill](../skills/shelf-life/SKILL.md) for planning and project management. This page describes the existing Markdown claim-audit CLI, which is a reusable implementation starting point. It does not yet implement industry-solution comparison, plan-version reports or skill dispatch; see [the target architecture](WISH-CODING.md).
+
 The direct runner reads one public Markdown file, extracts time-sensitive claims, searches Linkup and proposes narrow corrections. It writes a v1 event log that the workbench can display. It leaves the original file untouched and places the audit in review. It does not apply patches or open pull requests.
 
 Node.js 20 or later; no packages need installation. Git is used only by tests that check patch compatibility.
