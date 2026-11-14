@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildAudit, safeUrl } from '../model.mjs';
+import { buildAudit, messageAuthor, safeUrl } from '../model.mjs';
 
 function event(seq, type, payload = {}, extra = {}) { return { seq, eventId: `e${seq}`, type, payload, roomId: 'room', schemaVersion: 1, timestamp: '2026-11-14T14:00:00.000Z', provenance: {}, ...extra }; }
 
@@ -152,4 +152,39 @@ test('unknown task and run event types do not invent projected work', () => {
   assert.equal(model.metrics.eventCount, 2);
   assert.equal(model.runs.length, 0);
   assert.equal(model.tasks.length, 0);
+});
+
+test('known usage requires provider or estimated provenance even for numeric zero', () => {
+  const records = [
+    { inputTokens: 0, outputTokens: 0, costUsd: 0, source: 'provider' },
+    { inputTokens: 2, outputTokens: 3, costUsd: 0.01, source: 'estimated' },
+    { inputTokens: 2000, outputTokens: 4000, costUsd: 9, source: 'unknown' },
+    { inputTokens: 0, outputTokens: 0, costUsd: 0 },
+    { inputTokens: 0, outputTokens: 0, costUsd: 0, source: 'unsupported-source' },
+    { inputTokens: -1, outputTokens: Infinity, costUsd: NaN, source: 'provider' },
+  ];
+  const model = buildAudit(records.map((usage, index) => event(index + 1, 'run.completed', { usage }, { runId: 'r' + index })));
+  assert.deepEqual(model.metrics.totals.inputTokens, { value: 2, known: 2, missing: 4, estimated: true });
+  assert.deepEqual(model.metrics.totals.outputTokens, { value: 3, known: 2, missing: 4, estimated: true });
+  assert.deepEqual(model.metrics.totals.costUsd, { value: 0.01, known: 2, missing: 4, estimated: true });
+  const onlyUnknown = buildAudit([event(1, 'run.completed', { usage: records[2] }, { runId: 'r' })]);
+  assert.deepEqual(onlyUnknown.metrics.totals.costUsd, { value: 0, known: 0, missing: 1, estimated: false });
+});
+
+test('message author prefers explicit author then normalized provenance then System', () => {
+  const model = buildAudit([
+    event(1, 'member.joined', { memberId: 'explicit', displayName: 'Explicit author' }),
+    event(2, 'member.joined', { memberId: 'origin', displayName: 'Origin author' }),
+    event(3, 'message.posted', { author: 'explicit', content: 'Explicit wins' }, { provenance: { memberId: 'origin' } }),
+    event(4, 'message.posted', { content: 'Use origin' }, { provenance: { memberId: 'origin', role: {}, ignoredField: 'not copied' } }),
+    event(5, 'message.posted', { author: '   ' }, { provenance: { memberId: 'unregistered' } }),
+    event(6, 'message.posted', { author: 42 }, { provenance: { memberId: {} } }),
+  ]);
+  const messages = model.entries.filter(entry => entry.kind === 'message').map(entry => entry.event);
+  assert.deepEqual(messages.map(message => messageAuthor(message, model.members)), ['Explicit author', 'Origin author', 'unregistered', 'System']);
+  assert.equal(messages[1].provenance.memberId, 'origin');
+  assert.equal(messages[1].provenance.role, 'agent');
+  assert.equal(Object.hasOwn(messages[1].provenance, 'ignoredField'), false);
+  assert.equal(messages[3].provenance.memberId, null);
+  assert.equal(messageAuthor(null, model.members), 'System');
 });

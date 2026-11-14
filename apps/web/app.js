@@ -1,7 +1,8 @@
-import { buildAudit, safeUrl } from './model.mjs';
+import { buildAudit, messageAuthor, safeUrl } from './model.mjs';
 
 const $ = (id) => document.getElementById(id);
 const state = { rooms: [], roomId: '', room: null, events: [], ids: new Set(), cursor: 0, generation: 0, stream: null, controller: null, mode: null, listWarnings: [], warnings: [], connectionWarning: '', renderPending: false };
+const intentionallyClosedStreams = new WeakSet();
 const count = new Intl.NumberFormat('en-GB');
 const clock = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'Europe/London' });
 const date = new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' });
@@ -33,6 +34,11 @@ function setConnection(text, warning = false) {
   $('connection').classList.toggle('error-state', warning);
 }
 function setError(message) { $('error').hidden = !message; $('error').textContent = message || ''; }
+function closeStream(source) {
+  if (!source) return;
+  intentionallyClosedStreams.add(source);
+  source.close();
+}
 function scheduleRender() {
   if (state.renderPending) return;
   state.renderPending = true;
@@ -64,7 +70,7 @@ async function loadRooms() {
     const picker = $('room-picker'); picker.replaceChildren();
     if (!state.rooms.length) {
       add(picker, new Option('No recorded runs yet', ''));
-      state.controller?.abort(); state.stream?.close(); state.generation++;
+      state.controller?.abort(); closeStream(state.stream); state.generation++;
       Object.assign(state, { roomId: '', room: null, events: [], ids: new Set(), cursor: 0, warnings: [], connectionWarning: '' });
       setConnection('No recorded runs'); setError(''); render();
       return;
@@ -83,7 +89,7 @@ async function loadRooms() {
   } finally { refresh.disabled = false; }
 }
 async function selectRoom(roomId) {
-  state.controller?.abort(); state.stream?.close();
+  state.controller?.abort(); closeStream(state.stream);
   const generation = ++state.generation;
   const controller = new AbortController();
   Object.assign(state, { roomId, room: state.rooms.find(room => room.roomId === roomId) || null, events: [], ids: new Set(), cursor: 0, controller, stream: null, mode: null, warnings: [], connectionWarning: '' });
@@ -132,7 +138,7 @@ function connectStream(generation) {
   });
   source.addEventListener('stream-end', () => {
     if (generation !== state.generation) return;
-    source.close(); state.connectionWarning = '';
+    closeStream(source); state.connectionWarning = '';
     setConnection('Saved record loaded'); scheduleRender();
   });
   source.addEventListener('stream-warning', (message) => {
@@ -147,13 +153,17 @@ function connectStream(generation) {
     streamFailure(source, detail);
   });
   source.onerror = () => {
-    if (generation !== state.generation || source.readyState === EventSource.CLOSED) return;
-    state.connectionWarning = 'Connection interrupted. Showing the last received events while the feed reconnects.';
-    setConnection('Reconnecting', true); scheduleRender();
+    if (generation !== state.generation || intentionallyClosedStreams.has(source)) return;
+    if (source.readyState === EventSource.CONNECTING) {
+      state.connectionWarning = 'Connection interrupted. Showing the last received events while the feed reconnects.';
+      setConnection('Reconnecting', true); scheduleRender();
+    } else {
+      streamFailure(source, 'The event feed closed unexpectedly. Refresh runs or reselect this audit to reconnect.');
+    }
   };
 }
 function streamFailure(source, detail) {
-  source.close(); state.connectionWarning = 'Live updates stopped. The visible record may be incomplete.';
+  closeStream(source); state.connectionWarning = 'Live updates stopped. The visible record may be incomplete. Refresh runs or reselect the audit to reconnect.';
   setError(detail); setConnection('Feed stopped', true); scheduleRender();
 }
 function render() {
@@ -171,8 +181,12 @@ function render() {
   if (driver === 'direct') add($('badges'), label('Direct workflow', 'gray'));
   if (driver === 'harness') add($('badges'), label('Harness record', 'gray'));
   if (state.roomId) add($('badges'), label(status === 'completed' ? 'Run closed' : human(status), ['failed', 'cancelled'].includes(status) ? 'orange' : 'teal'));
-  const banner = $('provenance-banner'); banner.hidden = !synthetic && driver !== 'direct' && state.mode !== 'replay';
-  banner.textContent = synthetic ? 'Synthetic sample — the claims, sources, model names and usage below are example data. No live model or search produced this record.' : driver === 'direct' ? 'Direct workflow record — this run demonstrates the verification workflow; it does not demonstrate multi-agent scheduling.' : 'Saved replay — inspecting recorded events rather than a new execution.';
+  const banner = $('provenance-banner'), notices = [];
+  if (synthetic) notices.push('Synthetic sample — example claims, sources, model names and usage; no live model or search produced this record.');
+  if (driver === 'direct') notices.push('Direct workflow — this record does not demonstrate multi-agent scheduling.');
+  if (state.mode === 'replay') notices.push('Saved replay — showing recorded events, not a new execution.');
+  banner.hidden = notices.length === 0;
+  banner.textContent = notices.join(' ');
   const warnings = [...new Set([...state.listWarnings, ...state.warnings, ...audit.warnings, state.connectionWarning].filter(Boolean).map(warning => typeof warning === 'string' ? warning : warning.message || JSON.stringify(warning)))];
   $('warnings').hidden = warnings.length === 0; $('warnings').textContent = warnings.join(' ');
   $('summary').replaceChildren(metric('CLAIMS CHECKED', audit.metrics.claimCount - audit.metrics.counts.pending, `${audit.metrics.claimCount} extracted · ${audit.metrics.counts.pending} awaiting a verdict`), metric('OUTDATED', audit.metrics.counts.stale, 'Final stale verdicts', 'orange'), metric('NEEDS HUMAN REVIEW', audit.metrics.counts.unsure, 'Uncertain facts remain open', 'gold'), metric('TASKS ACCEPTED', `${audit.metrics.acceptedTasks} / ${audit.metrics.totalTasks}`, 'Recorded passing evidence', 'teal'));
@@ -188,7 +202,7 @@ function renderTimeline(audit) {
   for (const entry of audit.entries) {
     if (entry.kind === 'run') add(container, runCard(runs.get(entry.runId), audit));
     else if (entry.kind === 'message') {
-      const e = entry.event, p = e.payload, author = audit.members.get(p.author)?.displayName || p.author || 'System';
+      const e = entry.event, p = e.payload, author = messageAuthor(e, audit.members);
       const card = node('article', 'card message');
       add(card, add(node('div', 'card-heading'), add(node('div', 'identity'), node('span', 'avatar', p.kind === 'user' ? 'U' : '↗'), add(node('div'), node('strong', '', author), node('small', '', p.recipients?.length ? `To ${p.recipients.map(id => audit.members.get(id)?.displayName || id).join(', ')}` : 'Shared with the room'))), node('time', 'card-time', formatDate(e.timestamp, true))), node('p', 'message-body', p.content));
       add(container, card);
@@ -301,5 +315,5 @@ document.querySelector('[role="tablist"]').addEventListener('keydown', event => 
 });
 $('room-picker').addEventListener('change', event => selectRoom(event.target.value));
 $('refresh').addEventListener('click', loadRooms);
-window.addEventListener('pagehide', () => { state.stream?.close(); state.controller?.abort(); });
+window.addEventListener('pagehide', () => { closeStream(state.stream); state.controller?.abort(); });
 render(); loadRooms();

@@ -45,6 +45,14 @@ export function safeUrl(value) {
   } catch { return null; }
 }
 
+export function messageAuthor(event, members = new Map()) {
+  const e = record(event), p = record(e.payload), origin = provenance(e.provenance);
+  const explicit = text(p.author);
+  const authorId = explicit.trim() ? explicit : origin.memberId && origin.memberId.trim() ? origin.memberId : null;
+  if (!authorId) return 'System';
+  return text(members.get(authorId)?.displayName) || authorId;
+}
+
 export function buildAudit(events = []) {
   const room = { goal: '', status: 'waiting', driver: null, synthetic: false, acceptanceCriteria: [] };
   const members = new Map(), tasks = new Map(), runs = new Map(), claims = new Map();
@@ -80,7 +88,7 @@ export function buildAudit(events = []) {
     else if (e.type === 'member.joined' && typeof p.memberId === 'string') {
       members.set(p.memberId, { memberId: p.memberId, displayName: text(p.displayName, p.memberId), role: text(p.role, 'agent'),
         mode: text(p.mode), provider: nullableText(p.provider), model: nullableText(p.model) });
-    } else if (e.type === 'message.posted') entries.push({ kind: 'message', seq: e.seq, event: { timestamp: text(e.timestamp), payload: {
+    } else if (e.type === 'message.posted') entries.push({ kind: 'message', seq: e.seq, event: { timestamp: text(e.timestamp), provenance: provenance(e.provenance), payload: {
       messageId: text(p.messageId), author: text(p.author), recipients: strings(p.recipients), kind: text(p.kind), content: text(p.content), replyTo: nullableText(p.replyTo),
     } } });
     else if (e.type === 'task.created' && typeof e.taskId === 'string') tasks.set(e.taskId, {
@@ -153,7 +161,7 @@ export function buildAudit(events = []) {
   const completed = runList.filter(r => ['completed', 'failed', 'cancelled'].includes(r.status));
   const totals = {};
   for (const key of ['inputTokens', 'outputTokens', 'costUsd']) {
-    const known = completed.filter(r => number(r.usage?.[key]));
+    const known = completed.filter(r => ['provider', 'estimated'].includes(r.usage?.source) && number(r.usage?.[key]));
     totals[key] = { known: known.length, missing: completed.length - known.length, value: known.reduce((sum, r) => sum + r.usage[key], 0), estimated: known.some(r => r.usage.source === 'estimated') };
   }
   const counts = { stale: 0, fresh: 0, unsure: 0, pending: 0 };
