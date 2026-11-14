@@ -1,0 +1,871 @@
+{
+  "schemaVersion": 1,
+  "draftVersion": 1,
+  "status": "awaiting-human-review",
+  "verified": false,
+  "eligibleForScoring": false,
+  "notice": "NON-SCORING CANDIDATE. Machine observations and author intent are not verified labels. Keep outside workflow inputs.",
+  "datasetVersion": "handbook-4882eded-human-review-draft-v2",
+  "synthetic": false,
+  "handbookRef": "git:4882eded7ff6d5614eb720b900876dc10dc71928",
+  "preparedAtUtc": "2026-11-14T18:07:48Z",
+  "provenance": {
+    "handbookPR": "https://github.com/luoym525/ShallowSee-Harness/pull/5",
+    "handbookCommit": "4882eded7ff6d5614eb720b900876dc10dc71928",
+    "prStatusAtPreparation": "draft-unmerged",
+    "intent": {
+      "path": "eval/drafts/handbook-author-intent.json",
+      "gitBlobSha": "87f3a3b8c6a90da15a0381c1201dea9308ee10fc"
+    },
+    "worksheet": {
+      "path": "eval/drafts/handbook-reference-worksheet.md",
+      "gitBlobSha": "777a5759ae4478d6e851630fa38409cca64fb7b4",
+      "reportedBy": "Fable automated page fetches and summarising model",
+      "reportedLookupWindowVerified": false,
+      "timingNote": "The original worksheet commit records 17:30:52 UTC, before the reported 17:40 window end. The reviewed wording now calls this an unverified author record; no fetch logs establish actual retrieval times.",
+      "reportedLookupWindowUtc": {
+        "start": "2026-11-14T17:25:00Z",
+        "end": "2026-11-14T17:40:00Z"
+      },
+      "originalWorksheetCommit": "97010d003d4a8eea87697cbad3994966501df85f",
+      "originalWorksheetCommitterTimeUtc": "2026-11-14T17:30:52Z"
+    },
+    "documents": [
+      {
+        "path": "handbook/developer-tooling.md",
+        "gitBlobSha": "3441bb6a1d1e3690ac48119ee1f014005bf576f9"
+      },
+      {
+        "path": "handbook/platform-and-standards.md",
+        "gitBlobSha": "360f56ff22aa410e12c63a5f4e03637074069f26"
+      },
+      {
+        "path": "handbook/uk-payroll-and-tax.md",
+        "gitBlobSha": "ffd3266ccb8a45e0b024f3ceaf62d810a2aa4e26"
+      },
+      {
+        "path": "handbook/web-and-languages.md",
+        "gitBlobSha": "d60858fe41b56906061a2c12a60203c7948b0bab"
+      }
+    ]
+  },
+  "claims": [
+    {
+      "id": "f01",
+      "doc": "handbook/developer-tooling.md",
+      "lineStart": 5,
+      "lineEnd": 5,
+      "quote": "The latest stable release of Python is Python 3.11.",
+      "statedValue": "3.11",
+      "label": null,
+      "expectedValue": null,
+      "scope": null,
+      "asOfUtc": null,
+      "referenceUrls": [],
+      "verifiedBy": null,
+      "verifiedAtUtc": null,
+      "confidence": null,
+      "authorIntent": {
+        "plantedStale": true,
+        "verified": false
+      },
+      "machineObservation": {
+        "valueText": "3.15 (the download button reads 3.15.2)",
+        "suggestedLabelText": "stale",
+        "url": "https://www.python.org/downloads/",
+        "independentlyVerified": false,
+        "origin": "Pinned Fable worksheet; not independently revalidated"
+      },
+      "additionalSourceCandidates": [],
+      "reviewQuestions": [
+        "Confirm the latest stable/released value, scope and effective time from the original publisher."
+      ]
+    },
+    {
+      "id": "f02",
+      "doc": "handbook/developer-tooling.md",
+      "lineStart": 7,
+      "lineEnd": 7,
+      "quote": "The latest long-term support line of Node.js is Node.js 18.",
+      "statedValue": "18",
+      "label": null,
+      "expectedValue": null,
+      "scope": null,
+      "asOfUtc": null,
+      "referenceUrls": [],
+      "verifiedBy": null,
+      "verifiedAtUtc": null,
+      "confidence": null,
+      "authorIntent": {
+        "plantedStale": true,
+        "verified": false
+      },
+      "machineObservation": {
+        "valueText": "26 (v26 \"Lithium\" is marked LTS and \"Latest LTS\"; v18 is EOL)",
+        "suggestedLabelText": "stale",
+        "url": "https://nodejs.org/en/about/previous-releases",
+        "independentlyVerified": false,
+        "origin": "Pinned Fable worksheet; not independently revalidated"
+      },
+      "additionalSourceCandidates": [],
+      "reviewQuestions": [
+        "Confirm the latest stable/released value, scope and effective time from the original publisher."
+      ]
+    },
+    {
+      "id": "f03",
+      "doc": "handbook/developer-tooling.md",
+      "lineStart": 9,
+      "lineEnd": 9,
+      "quote": "The current edition of the Rust language is Rust 2021.",
+      "statedValue": "2021",
+      "label": null,
+      "expectedValue": null,
+      "scope": null,
+      "asOfUtc": null,
+      "referenceUrls": [],
+      "verifiedBy": null,
+      "verifiedAtUtc": null,
+      "confidence": null,
+      "authorIntent": {
+        "plantedStale": true,
+        "verified": false
+      },
+      "machineObservation": {
+        "valueText": "2024 (released with Rust 1.85.0; no newer edition listed)",
+        "suggestedLabelText": "stale",
+        "url": "https://doc.rust-lang.org/edition-guide/rust-2024/index.html",
+        "independentlyVerified": false,
+        "origin": "Pinned Fable worksheet; not independently revalidated"
+      },
+      "additionalSourceCandidates": [],
+      "reviewQuestions": [
+        "Confirm the latest stable/released value, scope and effective time from the original publisher."
+      ]
+    },
+    {
+      "id": "f04",
+      "doc": "handbook/developer-tooling.md",
+      "lineStart": 11,
+      "lineEnd": 11,
+      "quote": "GitHub blocks any file larger than 100 MiB.",
+      "statedValue": "100",
+      "label": null,
+      "expectedValue": null,
+      "scope": null,
+      "asOfUtc": null,
+      "referenceUrls": [],
+      "verifiedBy": null,
+      "verifiedAtUtc": null,
+      "confidence": null,
+      "authorIntent": {
+        "plantedStale": false,
+        "verified": false
+      },
+      "machineObservation": {
+        "valueText": "100 MiB (\"GitHub blocks files larger than 100 MiB\")",
+        "suggestedLabelText": "fresh",
+        "url": "https://docs.github.com/en/repositories/working-with-files/managing-large-files/about-large-files-on-github",
+        "independentlyVerified": false,
+        "origin": "Pinned Fable worksheet; not independently revalidated"
+      },
+      "additionalSourceCandidates": [
+        {
+          "url": "https://docs.github.com/en/repositories/working-with-files/managing-large-files/about-large-files-on-github",
+          "recordedAtUtc": "2026-11-14T18:20:32Z",
+          "method": "Codex automated browser lookup",
+          "observation": "The page applies file-size limits to regular Git repositories and directs files beyond 100 MiB to Git LFS.",
+          "limitation": "Resolve the handbook universal wording against regular Git versus LFS/release uploads.",
+          "humanVerified": false
+        }
+      ],
+      "reviewQuestions": [
+        "Confirm the scope of 'any file', including whether ordinary Git blobs, Git LFS or other uploads are intended."
+      ]
+    },
+    {
+      "id": "f05",
+      "doc": "handbook/developer-tooling.md",
+      "lineStart": 13,
+      "lineEnd": 13,
+      "quote": "New repositories on GitHub use main as the name of the default branch.",
+      "statedValue": "main",
+      "label": null,
+      "expectedValue": null,
+      "scope": null,
+      "asOfUtc": null,
+      "referenceUrls": [],
+      "verifiedBy": null,
+      "verifiedAtUtc": null,
+      "confidence": null,
+      "authorIntent": {
+        "plantedStale": false,
+        "verified": false
+      },
+      "machineObservation": {
+        "valueText": "main (\"GitHub names the default branch main in any new repository\")",
+        "suggestedLabelText": "fresh",
+        "url": "https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-branches",
+        "independentlyVerified": false,
+        "origin": "Pinned Fable worksheet; not independently revalidated"
+      },
+      "additionalSourceCandidates": [
+        {
+          "url": "https://docs.github.com/en/pull-requests/reference/branches",
+          "recordedAtUtc": "2026-11-14T18:20:32Z",
+          "method": "Codex automated browser lookup",
+          "observation": "GitHub documents main as the default and also allows configuring names for new repositories, including organization defaults.",
+          "limitation": "Resolve whether the claim describes the default behavior or every new repository regardless of configuration.",
+          "humanVerified": false
+        }
+      ],
+      "reviewQuestions": [
+        "Check account/organization default-branch configuration before treating this universal wording as fresh."
+      ]
+    },
+    {
+      "id": "f06",
+      "doc": "handbook/developer-tooling.md",
+      "lineStart": 15,
+      "lineEnd": 15,
+      "quote": "Docker Desktop needs a paid subscription at companies with more than 250 employees.",
+      "statedValue": "250",
+      "label": null,
+      "expectedValue": null,
+      "scope": null,
+      "asOfUtc": null,
+      "referenceUrls": [],
+      "verifiedBy": null,
+      "verifiedAtUtc": null,
+      "confidence": null,
+      "authorIntent": {
+        "plantedStale": false,
+        "verified": false
+      },
+      "machineObservation": {
+        "valueText": "250 (free tier is \"fewer than 250 employees AND less than $10 million in annual revenue\")",
+        "suggestedLabelText": "fresh",
+        "url": "https://docs.docker.com/subscription/desktop-license/",
+        "independentlyVerified": false,
+        "origin": "Pinned Fable worksheet; not independently revalidated"
+      },
+      "additionalSourceCandidates": [
+        {
+          "url": "https://docs.docker.com/subscription-billing/desktop-license/",
+          "recordedAtUtc": "2026-11-14T18:20:32Z",
+          "method": "Codex automated browser lookup",
+          "observation": "Small-business free use requires both fewer than 250 employees and annual revenue below 10 million USD; education, personal and noncommercial open-source cases are also listed.",
+          "limitation": "Confirm professional company-use scope and applicable license conditions; one employee threshold is not the full rule.",
+          "humanVerified": false
+        }
+      ],
+      "reviewQuestions": [
+        "Confirm employee/revenue conditions and company/licence scope; do not infer the full subscription rule from one threshold."
+      ]
+    },
+    {
+      "id": "f07",
+      "doc": "handbook/platform-and-standards.md",
+      "lineStart": 5,
+      "lineEnd": 5,
+      "quote": "The latest long-term support release of Ubuntu is Ubuntu 22.04 LTS.",
+      "statedValue": "22.04",
+      "label": null,
+      "expectedValue": null,
+      "scope": null,
+      "asOfUtc": null,
+      "referenceUrls": [],
+      "verifiedBy": null,
+      "verifiedAtUtc": null,
+      "confidence": null,
+      "authorIntent": {
+        "plantedStale": true,
+        "verified": false
+      },
+      "machineObservation": {
+        "valueText": "26.04 LTS (released April 2026)",
+        "suggestedLabelText": "stale",
+        "url": "https://ubuntu.com/about/release-cycle",
+        "independentlyVerified": false,
+        "origin": "Pinned Fable worksheet; not independently revalidated"
+      },
+      "additionalSourceCandidates": [],
+      "reviewQuestions": [
+        "Confirm the latest stable/released value, scope and effective time from the original publisher."
+      ]
+    },
+    {
+      "id": "f08",
+      "doc": "handbook/platform-and-standards.md",
+      "lineStart": 7,
+      "lineEnd": 7,
+      "quote": "The current stable release of Debian is Debian 12.",
+      "statedValue": "12",
+      "label": null,
+      "expectedValue": null,
+      "scope": null,
+      "asOfUtc": null,
+      "referenceUrls": [],
+      "verifiedBy": null,
+      "verifiedAtUtc": null,
+      "confidence": null,
+      "authorIntent": {
+        "plantedStale": true,
+        "verified": false
+      },
+      "machineObservation": {
+        "valueText": "13 (\"trixie\")",
+        "suggestedLabelText": "stale",
+        "url": "https://www.debian.org/releases/",
+        "independentlyVerified": false,
+        "origin": "Pinned Fable worksheet; not independently revalidated"
+      },
+      "additionalSourceCandidates": [],
+      "reviewQuestions": [
+        "Confirm the latest stable/released value, scope and effective time from the original publisher."
+      ]
+    },
+    {
+      "id": "f09",
+      "doc": "handbook/platform-and-standards.md",
+      "lineStart": 9,
+      "lineEnd": 9,
+      "quote": "The latest major version of PostgreSQL is PostgreSQL 15.",
+      "statedValue": "15",
+      "label": null,
+      "expectedValue": null,
+      "scope": null,
+      "asOfUtc": null,
+      "referenceUrls": [],
+      "verifiedBy": null,
+      "verifiedAtUtc": null,
+      "confidence": null,
+      "authorIntent": {
+        "plantedStale": true,
+        "verified": false
+      },
+      "machineObservation": {
+        "valueText": "18 (first released 25 Sep 2025; version 19 was at release candidate 2 and not in the table)",
+        "suggestedLabelText": "stale",
+        "url": "https://www.postgresql.org/support/versioning/",
+        "independentlyVerified": false,
+        "origin": "Pinned Fable worksheet; not independently revalidated"
+      },
+      "additionalSourceCandidates": [
+        {
+          "url": "https://www.postgresql.org/support/versioning/",
+          "recordedAtUtc": "2026-11-14T18:20:32Z",
+          "method": "Codex automated browser lookup",
+          "observation": "The fetched release table lists major 18; the page headline separately announces 19 RC 2.",
+          "limitation": "A human must distinguish stable general availability from an RC and capture the effective observation time.",
+          "humanVerified": false
+        }
+      ],
+      "reviewQuestions": [
+        "Distinguish a stable major release from release candidates; capture the actual effective date."
+      ]
+    },
+    {
+      "id": "f10",
+      "doc": "handbook/platform-and-standards.md",
+      "lineStart": 11,
+      "lineEnd": 11,
+      "quote": "The latest published version of the Web Content Accessibility Guidelines is WCAG 2.1.",
+      "statedValue": "2.1",
+      "label": null,
+      "expectedValue": null,
+      "scope": null,
+      "asOfUtc": null,
+      "referenceUrls": [],
+      "verifiedBy": null,
+      "verifiedAtUtc": null,
+      "confidence": null,
+      "authorIntent": {
+        "plantedStale": true,
+        "verified": false
+      },
+      "machineObservation": {
+        "valueText": "2.2 (published 5 Oct 2023; WCAG 3 is an early draft)",
+        "suggestedLabelText": "stale",
+        "url": "https://www.w3.org/WAI/standards-guidelines/wcag/",
+        "independentlyVerified": false,
+        "origin": "Pinned Fable worksheet; not independently revalidated"
+      },
+      "additionalSourceCandidates": [],
+      "reviewQuestions": [
+        "Confirm the latest stable/released value, scope and effective time from the original publisher."
+      ]
+    },
+    {
+      "id": "f11",
+      "doc": "handbook/platform-and-standards.md",
+      "lineStart": 13,
+      "lineEnd": 13,
+      "quote": "The newest version of the TLS protocol is TLS 1.3.",
+      "statedValue": "1.3",
+      "label": null,
+      "expectedValue": null,
+      "scope": null,
+      "asOfUtc": null,
+      "referenceUrls": [],
+      "verifiedBy": null,
+      "verifiedAtUtc": null,
+      "confidence": null,
+      "authorIntent": {
+        "plantedStale": false,
+        "verified": false
+      },
+      "machineObservation": {
+        "valueText": "1.3 (a 2026 RFC revises TLS 1.3 without a new version number)",
+        "suggestedLabelText": "fresh",
+        "url": "https://en.wikipedia.org/wiki/Transport_Layer_Security",
+        "independentlyVerified": false,
+        "origin": "Pinned Fable worksheet; not independently revalidated"
+      },
+      "additionalSourceCandidates": [
+        {
+          "url": "https://datatracker.ietf.org/doc/html/rfc9846",
+          "recordedAtUtc": "2026-11-14T18:07:48Z",
+          "method": "Codex automated browser lookup",
+          "observation": "IETF page identifies RFC 9846 as TLS 1.3 and says it obsoletes RFC 8446.",
+          "limitation": "This locates the revised TLS1.3 specification; a human still needs to establish the latest-version claim.",
+          "humanVerified": false
+        }
+      ],
+      "reviewQuestions": [
+        "Original worksheet uses Wikipedia. Additional IETF candidate is recorded separately; human verification remains pending."
+      ]
+    },
+    {
+      "id": "f12",
+      "doc": "handbook/platform-and-standards.md",
+      "lineStart": 15,
+      "lineEnd": 15,
+      "quote": "An AWS Lambda function can run for at most 15 minutes.",
+      "statedValue": "15",
+      "label": null,
+      "expectedValue": null,
+      "scope": null,
+      "asOfUtc": null,
+      "referenceUrls": [],
+      "verifiedBy": null,
+      "verifiedAtUtc": null,
+      "confidence": null,
+      "authorIntent": {
+        "plantedStale": false,
+        "verified": false
+      },
+      "machineObservation": {
+        "valueText": "900 seconds (15 minutes). The page also gives 90 minutes for one special case, Lambda Managed Instances",
+        "suggestedLabelText": "fresh, with a caveat",
+        "url": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-timeout.html",
+        "independentlyVerified": false,
+        "origin": "Pinned Fable worksheet; not independently revalidated"
+      },
+      "additionalSourceCandidates": [
+        {
+          "url": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-timeout.html",
+          "recordedAtUtc": "2026-11-14T18:20:32Z",
+          "method": "Codex automated browser lookup",
+          "observation": "The page states 900 seconds generally, with 5400 seconds for Managed Instances asynchronous/event-source invocations except Amazon MQ and DocumentDB.",
+          "limitation": "The unqualified at-most15minutes claim needs scope adjudication; do not automatically turn fresh-with-caveat into a gold label.",
+          "humanVerified": false
+        }
+      ],
+      "reviewQuestions": [
+        "Worksheet reports a Managed Instances exception. Human must resolve scope; 'fresh, with a caveat' is not a valid gold label."
+      ]
+    },
+    {
+      "id": "f13",
+      "doc": "handbook/uk-payroll-and-tax.md",
+      "lineStart": 5,
+      "lineEnd": 5,
+      "quote": "The National Living Wage for workers aged 21 and over is £11.44 an hour.",
+      "statedValue": "£11.44",
+      "label": null,
+      "expectedValue": null,
+      "scope": null,
+      "asOfUtc": null,
+      "referenceUrls": [],
+      "verifiedBy": null,
+      "verifiedAtUtc": null,
+      "confidence": null,
+      "authorIntent": {
+        "plantedStale": true,
+        "verified": false
+      },
+      "machineObservation": {
+        "valueText": "£12.71 (from April 2026; £13.21 is listed for April 2027)",
+        "suggestedLabelText": "stale",
+        "url": "https://www.gov.uk/national-minimum-wage-rates",
+        "independentlyVerified": false,
+        "origin": "Pinned Fable worksheet; not independently revalidated"
+      },
+      "additionalSourceCandidates": [],
+      "reviewQuestions": [
+        "Confirm age group, jurisdiction, effective date and hourly units."
+      ]
+    },
+    {
+      "id": "f14",
+      "doc": "handbook/uk-payroll-and-tax.md",
+      "lineStart": 7,
+      "lineEnd": 7,
+      "quote": "Employers pay National Insurance at a rate of 13.8% on earnings above the secondary threshold.",
+      "statedValue": "13.8%",
+      "label": null,
+      "expectedValue": null,
+      "scope": null,
+      "asOfUtc": null,
+      "referenceUrls": [],
+      "verifiedBy": null,
+      "verifiedAtUtc": null,
+      "confidence": null,
+      "authorIntent": {
+        "plantedStale": true,
+        "verified": false
+      },
+      "machineObservation": {
+        "valueText": "15% (category A, above the secondary threshold)",
+        "suggestedLabelText": "stale",
+        "url": "https://www.gov.uk/guidance/rates-and-thresholds-for-employers-2026-to-2027",
+        "independentlyVerified": false,
+        "origin": "Pinned Fable worksheet; not independently revalidated"
+      },
+      "additionalSourceCandidates": [],
+      "reviewQuestions": [
+        "Confirm tax year, employee category, threshold and percentage."
+      ]
+    },
+    {
+      "id": "f15",
+      "doc": "handbook/uk-payroll-and-tax.md",
+      "lineStart": 9,
+      "lineEnd": 9,
+      "quote": "The Bank of England base rate is 5.25%.",
+      "statedValue": "5.25%",
+      "label": null,
+      "expectedValue": null,
+      "scope": null,
+      "asOfUtc": null,
+      "referenceUrls": [],
+      "verifiedBy": null,
+      "verifiedAtUtc": null,
+      "confidence": null,
+      "authorIntent": {
+        "plantedStale": true,
+        "verified": false
+      },
+      "machineObservation": {
+        "valueText": "4% (changed 5 Nov 2026; next decision 17 Dec 2026)",
+        "suggestedLabelText": "stale",
+        "url": "https://www.bankofengland.co.uk/monetary-policy/the-interest-rate-bank-rate",
+        "independentlyVerified": false,
+        "origin": "Pinned Fable worksheet; not independently revalidated"
+      },
+      "additionalSourceCandidates": [],
+      "reviewQuestions": [
+        "Confirm decision effective time; this value can change during evaluation."
+      ]
+    },
+    {
+      "id": "f16",
+      "doc": "handbook/uk-payroll-and-tax.md",
+      "lineStart": 11,
+      "lineEnd": 11,
+      "quote": "The standard rate of VAT is 20%.",
+      "statedValue": "20%",
+      "label": null,
+      "expectedValue": null,
+      "scope": null,
+      "asOfUtc": null,
+      "referenceUrls": [],
+      "verifiedBy": null,
+      "verifiedAtUtc": null,
+      "confidence": null,
+      "authorIntent": {
+        "plantedStale": false,
+        "verified": false
+      },
+      "machineObservation": {
+        "valueText": "20%",
+        "suggestedLabelText": "fresh",
+        "url": "https://www.gov.uk/vat-rates",
+        "independentlyVerified": false,
+        "origin": "Pinned Fable worksheet; not independently revalidated"
+      },
+      "additionalSourceCandidates": [],
+      "reviewQuestions": [
+        "Confirm United Kingdom standard-rate scope and exceptions."
+      ]
+    },
+    {
+      "id": "f17",
+      "doc": "handbook/uk-payroll-and-tax.md",
+      "lineStart": 13,
+      "lineEnd": 13,
+      "quote": "The main rate of corporation tax is 25%.",
+      "statedValue": "25%",
+      "label": null,
+      "expectedValue": null,
+      "scope": null,
+      "asOfUtc": null,
+      "referenceUrls": [],
+      "verifiedBy": null,
+      "verifiedAtUtc": null,
+      "confidence": null,
+      "authorIntent": {
+        "plantedStale": false,
+        "verified": false
+      },
+      "machineObservation": {
+        "valueText": "25%",
+        "suggestedLabelText": "fresh",
+        "url": "https://www.gov.uk/corporation-tax-rates",
+        "independentlyVerified": false,
+        "origin": "Pinned Fable worksheet; not independently revalidated"
+      },
+      "additionalSourceCandidates": [],
+      "reviewQuestions": [
+        "Confirm tax year and main-rate scope rather than every company/effective rate."
+      ]
+    },
+    {
+      "id": "f18",
+      "doc": "handbook/uk-payroll-and-tax.md",
+      "lineStart": 15,
+      "lineEnd": 15,
+      "quote": "The income tax personal allowance is £12,570 a year.",
+      "statedValue": "£12,570",
+      "label": null,
+      "expectedValue": null,
+      "scope": null,
+      "asOfUtc": null,
+      "referenceUrls": [],
+      "verifiedBy": null,
+      "verifiedAtUtc": null,
+      "confidence": null,
+      "authorIntent": {
+        "plantedStale": false,
+        "verified": false
+      },
+      "machineObservation": {
+        "valueText": "£12,570 (tax year 6 April 2026 to 5 April 2027)",
+        "suggestedLabelText": "fresh",
+        "url": "https://www.gov.uk/income-tax-rates",
+        "independentlyVerified": false,
+        "origin": "Pinned Fable worksheet; not independently revalidated"
+      },
+      "additionalSourceCandidates": [],
+      "reviewQuestions": [
+        "Confirm tax year and eligibility/tapering scope."
+      ]
+    },
+    {
+      "id": "f19",
+      "doc": "handbook/web-and-languages.md",
+      "lineStart": 5,
+      "lineEnd": 5,
+      "quote": "The latest major version of React is React 18.",
+      "statedValue": "18",
+      "label": null,
+      "expectedValue": null,
+      "scope": null,
+      "asOfUtc": null,
+      "referenceUrls": [],
+      "verifiedBy": null,
+      "verifiedAtUtc": null,
+      "confidence": null,
+      "authorIntent": {
+        "plantedStale": true,
+        "verified": false
+      },
+      "machineObservation": {
+        "valueText": "19 (the page's latest version is 19.3)",
+        "suggestedLabelText": "stale",
+        "url": "https://react.dev/versions",
+        "independentlyVerified": false,
+        "origin": "Pinned Fable worksheet; not independently revalidated"
+      },
+      "additionalSourceCandidates": [],
+      "reviewQuestions": [
+        "Confirm the latest stable/released value, scope and effective time from the original publisher."
+      ]
+    },
+    {
+      "id": "f20",
+      "doc": "handbook/web-and-languages.md",
+      "lineStart": 7,
+      "lineEnd": 7,
+      "quote": "The latest long-term support release of Java is Java 17.",
+      "statedValue": "17",
+      "label": null,
+      "expectedValue": null,
+      "scope": null,
+      "asOfUtc": null,
+      "referenceUrls": [],
+      "verifiedBy": null,
+      "verifiedAtUtc": null,
+      "confidence": null,
+      "authorIntent": {
+        "plantedStale": true,
+        "verified": false
+      },
+      "machineObservation": {
+        "valueText": "25 (released 16 Sep 2025). Oracle's own roadmap page refused the automated fetch, so this came from Wikipedia: check Oracle's page by hand",
+        "suggestedLabelText": "stale",
+        "url": "https://en.wikipedia.org/wiki/Java_version_history",
+        "independentlyVerified": false,
+        "origin": "Pinned Fable worksheet; not independently revalidated"
+      },
+      "additionalSourceCandidates": [
+        {
+          "url": "https://www.oracle.com/java/technologies/java-se-support-roadmap.html",
+          "recordedAtUtc": "2026-11-14T18:07:48Z",
+          "method": "Codex automated browser lookup",
+          "observation": "Oracle roadmap lists Java 25 among LTS releases and Java 27 as non-LTS.",
+          "limitation": "Check the latest released LTS line and applicable vendor/support scope at the evaluation time.",
+          "humanVerified": false
+        }
+      ],
+      "reviewQuestions": [
+        "Original worksheet uses Wikipedia. Additional Oracle candidate is recorded separately; human verification remains pending."
+      ]
+    },
+    {
+      "id": "f21",
+      "doc": "handbook/web-and-languages.md",
+      "lineStart": 9,
+      "lineEnd": 9,
+      "quote": "The most recent edition of the ECMAScript standard is ECMAScript 2023.",
+      "statedValue": "2023",
+      "label": null,
+      "expectedValue": null,
+      "scope": null,
+      "asOfUtc": null,
+      "referenceUrls": [],
+      "verifiedBy": null,
+      "verifiedAtUtc": null,
+      "confidence": null,
+      "authorIntent": {
+        "plantedStale": true,
+        "verified": false
+      },
+      "machineObservation": {
+        "valueText": "2026 (17th edition, June 2026)",
+        "suggestedLabelText": "stale",
+        "url": "https://ecma-international.org/publications-and-standards/standards/ecma-262/",
+        "independentlyVerified": false,
+        "origin": "Pinned Fable worksheet; not independently revalidated"
+      },
+      "additionalSourceCandidates": [],
+      "reviewQuestions": [
+        "Confirm the latest stable/released value, scope and effective time from the original publisher."
+      ]
+    },
+    {
+      "id": "f22",
+      "doc": "handbook/web-and-languages.md",
+      "lineStart": 11,
+      "lineEnd": 11,
+      "quote": "The latest stable release of Go is Go 1.21.",
+      "statedValue": "1.21",
+      "label": null,
+      "expectedValue": null,
+      "scope": null,
+      "asOfUtc": null,
+      "referenceUrls": [],
+      "verifiedBy": null,
+      "verifiedAtUtc": null,
+      "confidence": null,
+      "authorIntent": {
+        "plantedStale": true,
+        "verified": false
+      },
+      "machineObservation": {
+        "valueText": "1.27 (go1.27.0 on 19 Aug 2026; latest revision go1.27.4)",
+        "suggestedLabelText": "stale",
+        "url": "https://go.dev/doc/devel/release",
+        "independentlyVerified": false,
+        "origin": "Pinned Fable worksheet; not independently revalidated"
+      },
+      "additionalSourceCandidates": [],
+      "reviewQuestions": [
+        "Confirm the latest stable/released value, scope and effective time from the original publisher."
+      ]
+    },
+    {
+      "id": "f23",
+      "doc": "handbook/web-and-languages.md",
+      "lineStart": 13,
+      "lineEnd": 13,
+      "quote": "The newest version of HTTP is HTTP/3.",
+      "statedValue": "HTTP/3",
+      "label": null,
+      "expectedValue": null,
+      "scope": null,
+      "asOfUtc": null,
+      "referenceUrls": [],
+      "verifiedBy": null,
+      "verifiedAtUtc": null,
+      "confidence": null,
+      "authorIntent": {
+        "plantedStale": false,
+        "verified": false
+      },
+      "machineObservation": {
+        "valueText": "HTTP/3 (RFC 9114, June 2022; nothing newer listed)",
+        "suggestedLabelText": "fresh",
+        "url": "https://en.wikipedia.org/wiki/HTTP",
+        "independentlyVerified": false,
+        "origin": "Pinned Fable worksheet; not independently revalidated"
+      },
+      "additionalSourceCandidates": [
+        {
+          "url": "https://www.rfc-editor.org/info/rfc9114/",
+          "recordedAtUtc": "2026-11-14T18:07:48Z",
+          "method": "Codex automated browser lookup",
+          "observation": "RFC Editor identifies RFC 9114 as the HTTP/3 specification.",
+          "limitation": "The existence of this specification alone does not prove no newer HTTP version exists.",
+          "humanVerified": false
+        }
+      ],
+      "reviewQuestions": [
+        "Original worksheet uses Wikipedia. Additional RFC Editor candidate is recorded separately; human verification remains pending."
+      ]
+    },
+    {
+      "id": "f24",
+      "doc": "handbook/web-and-languages.md",
+      "lineStart": 15,
+      "lineEnd": 15,
+      "quote": "Kubernetes publishes three minor releases a year.",
+      "statedValue": "three",
+      "label": null,
+      "expectedValue": null,
+      "scope": null,
+      "asOfUtc": null,
+      "referenceUrls": [],
+      "verifiedBy": null,
+      "verifiedAtUtc": null,
+      "confidence": null,
+      "authorIntent": {
+        "plantedStale": false,
+        "verified": false
+      },
+      "machineObservation": {
+        "valueText": "\"approximately three times per year\"",
+        "suggestedLabelText": "fresh",
+        "url": "https://kubernetes.io/releases/release/",
+        "independentlyVerified": false,
+        "origin": "Pinned Fable worksheet; not independently revalidated"
+      },
+      "additionalSourceCandidates": [],
+      "reviewQuestions": [
+        "Check approximate-versus-exact frequency and 'three' versus numeric '3' without silently changing the handbook."
+      ]
+    }
+  ],
+  "updatedAtUtc": "2026-11-14T18:20:32Z"
+}
