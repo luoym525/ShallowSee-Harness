@@ -1,0 +1,248 @@
+{
+  "what": "The handbook author's intent for each fact in handbook/. This is NOT gold and NOT verified.",
+  "verified": false,
+  "howToUse": "A person must check every fact against a primary source and record the current value before anything here is used for scoring. plantedStale only says which values the author deliberately wrote out of date. A fact marked false may still have changed since it was written.",
+  "writtenAt": "2026-11-14",
+  "facts": [
+    {
+      "factId": "f01",
+      "doc": "handbook/developer-tooling.md",
+      "line": 5,
+      "quote": "The latest stable release of Python is Python 3.11.",
+      "statedValue": "3.11",
+      "plantedStale": true,
+      "primarySourceToCheck": "python.org",
+      "authorNote": "Was the latest stable release in 2023."
+    },
+    {
+      "factId": "f02",
+      "doc": "handbook/developer-tooling.md",
+      "line": 7,
+      "quote": "The latest long-term support line of Node.js is Node.js 18.",
+      "statedValue": "18",
+      "plantedStale": true,
+      "primarySourceToCheck": "nodejs.org",
+      "authorNote": "Node.js 18 left long-term support in 2025."
+    },
+    {
+      "factId": "f03",
+      "doc": "handbook/developer-tooling.md",
+      "line": 9,
+      "quote": "The current edition of the Rust language is Rust 2021.",
+      "statedValue": "2021",
+      "plantedStale": true,
+      "primarySourceToCheck": "rust-lang.org",
+      "authorNote": "A newer Rust edition was released in 2025."
+    },
+    {
+      "factId": "f04",
+      "doc": "handbook/developer-tooling.md",
+      "line": 11,
+      "quote": "GitHub blocks any file larger than 100 MiB.",
+      "statedValue": "100",
+      "plantedStale": false,
+      "primarySourceToCheck": "docs.github.com",
+      "authorNote": "Believed still correct. Check the GitHub documentation on large files."
+    },
+    {
+      "factId": "f05",
+      "doc": "handbook/developer-tooling.md",
+      "line": 13,
+      "quote": "New repositories on GitHub use main as the name of the default branch.",
+      "statedValue": "main",
+      "plantedStale": false,
+      "primarySourceToCheck": "docs.github.com",
+      "authorNote": "Believed still correct."
+    },
+    {
+      "factId": "f06",
+      "doc": "handbook/developer-tooling.md",
+      "line": 15,
+      "quote": "Docker Desktop needs a paid subscription at companies with more than 250 employees.",
+      "statedValue": "250",
+      "plantedStale": false,
+      "primarySourceToCheck": "docker.com",
+      "authorNote": "Believed still correct. Check the Docker subscription terms."
+    },
+    {
+      "factId": "f07",
+      "doc": "handbook/platform-and-standards.md",
+      "line": 5,
+      "quote": "The latest long-term support release of Ubuntu is Ubuntu 22.04 LTS.",
+      "statedValue": "22.04",
+      "plantedStale": true,
+      "primarySourceToCheck": "ubuntu.com",
+      "authorNote": "Newer long-term support releases followed in 2024 and 2026."
+    },
+    {
+      "factId": "f08",
+      "doc": "handbook/platform-and-standards.md",
+      "line": 7,
+      "quote": "The current stable release of Debian is Debian 12.",
+      "statedValue": "12",
+      "plantedStale": true,
+      "primarySourceToCheck": "debian.org",
+      "authorNote": "A newer stable release followed in 2025."
+    },
+    {
+      "factId": "f09",
+      "doc": "handbook/platform-and-standards.md",
+      "line": 9,
+      "quote": "The latest major version of PostgreSQL is PostgreSQL 15.",
+      "statedValue": "15",
+      "plantedStale": true,
+      "primarySourceToCheck": "postgresql.org",
+      "authorNote": "PostgreSQL releases a new major version every year."
+    },
+    {
+      "factId": "f10",
+      "doc": "handbook/platform-and-standards.md",
+      "line": 11,
+      "quote": "The latest published version of the Web Content Accessibility Guidelines is WCAG 2.1.",
+      "statedValue": "2.1",
+      "plantedStale": true,
+      "primarySourceToCheck": "w3.org",
+      "authorNote": "WCAG 2.2 became a W3C Recommendation in October 2023."
+    },
+    {
+      "factId": "f11",
+      "doc": "handbook/platform-and-standards.md",
+      "line": 13,
+      "quote": "The newest version of the TLS protocol is TLS 1.3.",
+      "statedValue": "1.3",
+      "plantedStale": false,
+      "primarySourceToCheck": "ietf.org",
+      "authorNote": "Believed still correct."
+    },
+    {
+      "factId": "f12",
+      "doc": "handbook/platform-and-standards.md",
+      "line": 15,
+      "quote": "An AWS Lambda function can run for at most 15 minutes.",
+      "statedValue": "15",
+      "plantedStale": false,
+      "primarySourceToCheck": "docs.aws.amazon.com",
+      "authorNote": "Believed still correct."
+    },
+    {
+      "factId": "f13",
+      "doc": "handbook/uk-payroll-and-tax.md",
+      "line": 5,
+      "quote": "The National Living Wage for workers aged 21 and over is £11.44 an hour.",
+      "statedValue": "£11.44",
+      "plantedStale": true,
+      "primarySourceToCheck": "gov.uk",
+      "authorNote": "This was the rate from April 2024. It rises every April."
+    },
+    {
+      "factId": "f14",
+      "doc": "handbook/uk-payroll-and-tax.md",
+      "line": 7,
+      "quote": "Employers pay National Insurance at a rate of 13.8% on earnings above the secondary threshold.",
+      "statedValue": "13.8%",
+      "plantedStale": true,
+      "primarySourceToCheck": "gov.uk",
+      "authorNote": "The employer rate changed in April 2025."
+    },
+    {
+      "factId": "f15",
+      "doc": "handbook/uk-payroll-and-tax.md",
+      "line": 9,
+      "quote": "The Bank of England base rate is 5.25%.",
+      "statedValue": "5.25%",
+      "plantedStale": true,
+      "primarySourceToCheck": "bankofengland.co.uk",
+      "authorNote": "This was the rate until August 2024."
+    },
+    {
+      "factId": "f16",
+      "doc": "handbook/uk-payroll-and-tax.md",
+      "line": 11,
+      "quote": "The standard rate of VAT is 20%.",
+      "statedValue": "20%",
+      "plantedStale": false,
+      "primarySourceToCheck": "gov.uk",
+      "authorNote": "Believed still correct."
+    },
+    {
+      "factId": "f17",
+      "doc": "handbook/uk-payroll-and-tax.md",
+      "line": 13,
+      "quote": "The main rate of corporation tax is 25%.",
+      "statedValue": "25%",
+      "plantedStale": false,
+      "primarySourceToCheck": "gov.uk",
+      "authorNote": "Believed still correct."
+    },
+    {
+      "factId": "f18",
+      "doc": "handbook/uk-payroll-and-tax.md",
+      "line": 15,
+      "quote": "The income tax personal allowance is £12,570 a year.",
+      "statedValue": "£12,570",
+      "plantedStale": false,
+      "primarySourceToCheck": "gov.uk",
+      "authorNote": "Believed still correct."
+    },
+    {
+      "factId": "f19",
+      "doc": "handbook/web-and-languages.md",
+      "line": 5,
+      "quote": "The latest major version of React is React 18.",
+      "statedValue": "18",
+      "plantedStale": true,
+      "primarySourceToCheck": "react.dev",
+      "authorNote": "A newer major version was released in December 2024."
+    },
+    {
+      "factId": "f20",
+      "doc": "handbook/web-and-languages.md",
+      "line": 7,
+      "quote": "The latest long-term support release of Java is Java 17.",
+      "statedValue": "17",
+      "plantedStale": true,
+      "primarySourceToCheck": "oracle.com",
+      "authorNote": "Newer long-term support releases followed in 2023 and 2025."
+    },
+    {
+      "factId": "f21",
+      "doc": "handbook/web-and-languages.md",
+      "line": 9,
+      "quote": "The most recent edition of the ECMAScript standard is ECMAScript 2023.",
+      "statedValue": "2023",
+      "plantedStale": true,
+      "primarySourceToCheck": "ecma-international.org",
+      "authorNote": "A new edition is published every June."
+    },
+    {
+      "factId": "f22",
+      "doc": "handbook/web-and-languages.md",
+      "line": 11,
+      "quote": "The latest stable release of Go is Go 1.21.",
+      "statedValue": "1.21",
+      "plantedStale": true,
+      "primarySourceToCheck": "go.dev",
+      "authorNote": "Go releases a new version twice a year."
+    },
+    {
+      "factId": "f23",
+      "doc": "handbook/web-and-languages.md",
+      "line": 13,
+      "quote": "The newest version of HTTP is HTTP/3.",
+      "statedValue": "HTTP/3",
+      "plantedStale": false,
+      "primarySourceToCheck": "ietf.org",
+      "authorNote": "Believed still correct."
+    },
+    {
+      "factId": "f24",
+      "doc": "handbook/web-and-languages.md",
+      "line": 15,
+      "quote": "Kubernetes publishes three minor releases a year.",
+      "statedValue": "three",
+      "plantedStale": false,
+      "primarySourceToCheck": "kubernetes.io",
+      "authorNote": "Believed still correct."
+    }
+  ]
+}
