@@ -6,12 +6,23 @@ const issuedErrors = new WeakSet();
 const backends = new Set(['api', 'cli', 'mcp', 'fake']);
 const capabilities = new Set(['search', 'read_files', 'write_files', 'run_command', 'read_artifacts']);
 const coreDenials = new Set(['SEARCH_DENIED', 'TOOL_DENIED', 'WORKSPACE_WRITE_DENIED', 'STALE_RUN', 'CANDIDATE_SUPERSEDED']);
+const dispatchDenials = new Set(['PROJECT_PAUSED', 'REWORK_EXHAUSTED', 'PLAN_UNCONFIRMED', 'CANDIDATE_REQUIRED',
+  'GUIDE_EXISTS', 'GUIDE_REQUIRED', 'TEST_EXISTS', 'DELIVERY_REQUIRED']);
 const messages = Object.freeze({
   INVALID_CONFIG: 'The runtime configuration is invalid.',
   COORDINATOR_IN_USE: 'This coordinator already has an execution runtime.',
   INVALID_START: 'The start request contains invalid fields.',
   START_CONFLICT: 'The start command ID already has different inputs.',
   TASK_NOT_FOUND: 'The selected task or role profile is unavailable.',
+  TASK_NOT_ELIGIBLE: 'The task is no longer eligible to start.',
+  PROJECT_PAUSED: 'The project is paused.',
+  REWORK_EXHAUSTED: 'The project has reached its rework limit.',
+  PLAN_UNCONFIRMED: 'The plan is awaiting confirmation.',
+  CANDIDATE_REQUIRED: 'The task requires a candidate.',
+  GUIDE_EXISTS: 'A guide already exists for this candidate.',
+  GUIDE_REQUIRED: 'The task requires a candidate guide.',
+  TEST_EXISTS: 'A test result already exists for this candidate.',
+  DELIVERY_REQUIRED: 'The task requires an accepted delivery.',
   ADAPTER_NOT_FOUND: 'The requested adapter is unavailable.',
   ADAPTER_PROFILE_MISMATCH: 'The adapter does not match the configured role model and backend.',
   ADAPTER_UNMEDIATED: 'The adapter cannot run with this tool broker.',
@@ -190,10 +201,11 @@ function usageSnapshot(input) {
 }
 
 function executionContext(project, task, profile, run) {
-  const plan = task.planVersion === null ? project.plans.at(-1) : project.plans.find(item => item.version === task.planVersion);
-  const candidateVersion = run.candidateVersion ?? run.baseCandidateVersion;
-  const candidate = project.candidates.find(item => item.version === candidateVersion);
   const delivery = project.deliveries.find(item => item.id === run.deliveryId);
+  const planVersion = delivery?.planVersion ?? task.planVersion;
+  const plan = planVersion === null ? project.plans.at(-1) : project.plans.find(item => item.version === planVersion);
+  const candidateVersion = delivery?.candidateVersion ?? run.candidateVersion ?? run.baseCandidateVersion;
+  const candidate = project.candidates.find(item => item.version === candidateVersion);
   return deepFreeze({
     project: { id: project.id, goal: project.goal, constraints: project.constraints, stage: project.stage },
     plan: plan ? {
@@ -263,6 +275,9 @@ function executeClaim({ coordinator, adapter, registry, limits, claim, context, 
     const candidateVersion = project.candidate?.version ?? null;
     const expected = context.task.kind === 'development' ? claim.baseCandidateVersion : claim.candidateVersion;
     requireThat((context.task.kind !== 'development' && expected === null) || expected === candidateVersion, 'CANDIDATE_SUPERSEDED');
+    const dispatch = coordinator.dispatch({ projectId: claim.projectId, kind: context.task.kind });
+    requireThat(dispatch?.permitted === true, dispatchDenials.has(dispatch?.reason) ? dispatch.reason : 'TASK_NOT_ELIGIBLE');
+    requireThat(dispatch.agentId === claim.agentId && dispatch.role === context.profile.role, 'STALE_RUN');
   }
 
   function invokeTool(tool, args) {
@@ -380,7 +395,7 @@ function executeClaim({ coordinator, adapter, registry, limits, claim, context, 
 }
 
 export function createRuntime({ coordinator, adapters = [], tools = [], limits = {} } = {}) {
-  requireThat(coordinator && ['getProject', 'claimTask', 'authorizeTool', 'recordRunEnd'].every(key => typeof coordinator[key] === 'function'),
+  requireThat(coordinator && ['getProject', 'claimTask', 'dispatch', 'authorizeTool', 'recordRunEnd'].every(key => typeof coordinator[key] === 'function'),
     'INVALID_CONFIG');
   requireThat(!owners.has(coordinator), 'COORDINATOR_IN_USE');
   const settings = readLimits(limits);

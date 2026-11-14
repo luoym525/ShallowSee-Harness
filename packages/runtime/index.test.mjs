@@ -19,7 +19,7 @@ function deferred() {
   return { promise, resolve };
 }
 
-function fixture(t, backend = 'fake') {
+function fixture(t, { backend = 'fake', maxRework = 1 } = {}) {
   const projectId = 'project';
   const authority = Symbol('test operator');
   const workspace = mkdtempSync(join(tmpdir(), 'shallowsee-runtime-'));
@@ -28,12 +28,18 @@ function fixture(t, backend = 'fake') {
   let seq = 0;
   const input = (fields = {}) => ({ commandId: 'fixture-' + ++seq, projectId, ...fields });
   const profiles = roles.map(role => ({ id: role + '-fixture', role, backend, model: 'fixture-model', tools: ['search', 'read_files', 'write_files'] }));
-  core.createProject(input({ goal: 'Deliver an example', constraints: ['Use test fixtures'], profiles }));
-  const plan = core.definePlan(input({ plan: {
+  core.createProject(input({ goal: 'Deliver an example', constraints: ['Use test fixtures'], profiles, maxRework }));
+  const planBody = {
     summary: 'Build a small example', scope: ['One working command'], architecture: 'One component',
     workItems: ['Implement, document and test'], acceptanceCriteria: ['Test passes'],
-  } }));
-  core.confirmPlan(input({ planVersion: plan.version, planDigest: plan.digest, confirmationRef: 'human-confirmation' }), authority);
+  };
+  function propose(summary) {
+    return core.definePlan(input({ plan: { ...planBody, summary } }));
+  }
+  function confirm(plan) {
+    return core.confirmPlan(input({ planVersion: plan.version, planDigest: plan.digest, confirmationRef: 'human-confirmation' }), authority);
+  }
+  const originalPlan = confirm(propose(planBody.summary));
   const state = () => core.getProject(projectId);
   const task = (kind, extra = {}) => core.createTask(input({ taskId: kind + '-' + seq, title: kind, kind, workspace, ...extra }));
   const claim = current => core.claimTask(input({
@@ -52,14 +58,22 @@ function fixture(t, backend = 'fake') {
     core.recordRunEnd(input({ ...identity(run), outcome: 'completed' }));
     return run;
   };
-  const candidate = run => core.submitCandidate(input({ ...identity(run), contentRef: commit })).candidate;
-  function guide(current) {
-    const run = completeDirectly(task('documentation'));
+  const candidate = (run, contentRef = commit) => core.submitCandidate(input({ ...identity(run), contentRef })).candidate;
+  function guide(current, run = completeDirectly(task('documentation'))) {
     return core.recordGuide(input({
       ...identity(run), candidateVersion: current.version, contentRef: current.contentRef, guideVersion: 'guide-v1', guideRef: 'guide-location',
     })).guide;
   }
-  return { authority, core, state, task, claim, identity, adapter, startRequest, input, candidate, guide };
+  function recordTest(run, current, guide, passed) {
+    return core.recordTestResult(input({
+      ...identity(run), candidateVersion: current.version, contentRef: current.contentRef,
+      guideVersion: guide.version, passed, reportRef: 'independent-report',
+    })).test;
+  }
+  return {
+    authority, core, state, task, claim, identity, adapter, startRequest, input, candidate, guide,
+    recordTest, completeDirectly, propose, confirm, originalPlan,
+  };
 }
 
 test('registered alias authorizes actual tool execution, with immutable context and idempotent start and tool calls', async t => {
@@ -139,10 +153,7 @@ test('search and forged canonical alias requests are blocked before developer, t
   const guide = f.guide(compiled);
   const tester = await execute('testing');
   assert.equal(f.state().candidate.test, null);
-  f.core.recordTestResult(f.input({
-    ...f.identity(tester), candidateVersion: compiled.version, contentRef: compiled.contentRef,
-    guideVersion: guide.version, passed: true, reportRef: 'independent-report',
-  }));
+  f.recordTest(tester, compiled, guide, true);
   const delivery = f.core.acceptDelivery(f.input({
     candidateVersion: compiled.version, contentRef: compiled.contentRef, guideVersion: guide.version,
     reportRef: 'independent-report', confirmationRef: 'operator-accept',
@@ -153,7 +164,7 @@ test('search and forged canonical alias requests are blocked before developer, t
 });
 
 test('mismatched model and unmediated CLI adapters are rejected before claiming or running', t => {
-  const f = fixture(t, 'cli');
+  const f = fixture(t, { backend: 'cli' });
   let launches = 0;
   const execute = () => { launches++; return { output: null }; };
   const runtime = createRuntime({
@@ -216,6 +227,86 @@ test('pause between claim and dispatch fences the adapter before it starts', asy
   assert.equal(result.outcome, 'failed');
   assert.equal(result.current, false);
   assert.equal(result.error.code, 'STALE_RUN');
+});
+
+test('a failed test that exhausts rework after claim prevents the development adapter from starting', async t => {
+  const f = fixture(t, { maxRework: 0 });
+  const candidate = f.candidate(f.completeDirectly(f.task('development')));
+  const guide = f.guide(candidate);
+  const tester = f.completeDirectly(f.task('testing'));
+  let launches = 0;
+  const runtime = createRuntime({
+    coordinator: f.core,
+    adapters: [f.adapter(() => { launches++; return { output: null }; })],
+  });
+
+  const handle = runtime.start(f.startRequest(f.task('development')));
+  f.recordTest(tester, candidate, guide, false);
+  assert.equal(f.state().blocked, true);
+
+  const result = await handle.done;
+  assert.equal(launches, 0);
+  assert.equal(result.outcome, 'failed');
+  assert.equal(result.current, false);
+  assert.equal(result.error.code, 'REWORK_EXHAUSTED');
+});
+
+for (const { kind, reason, competingOutcome } of [
+  { kind: 'documentation', reason: 'GUIDE_EXISTS', competingOutcome: (f, candidate, run) => f.guide(candidate, run) },
+  { kind: 'testing', reason: 'TEST_EXISTS', competingOutcome: (f, candidate, run, guide) => f.recordTest(run, candidate, guide, true) },
+]) {
+  test('a competing result prevents a queued ' + kind + ' adapter from starting', async t => {
+    const f = fixture(t);
+    const candidate = f.candidate(f.completeDirectly(f.task('development')));
+    const guide = kind === 'testing' ? f.guide(candidate) : null;
+    const competingRun = f.completeDirectly(f.task(kind));
+    let launches = 0;
+    const runtime = createRuntime({
+      coordinator: f.core,
+      adapters: [f.adapter(() => { launches++; return { output: null }; })],
+    });
+
+    const handle = runtime.start(f.startRequest(f.task(kind)));
+    competingOutcome(f, candidate, competingRun, guide);
+
+    const result = await handle.done;
+    assert.equal(launches, 0);
+    assert.equal(result.outcome, 'failed');
+    assert.equal(result.current, false);
+    assert.equal(result.error.code, reason);
+  });
+}
+
+test('support context pins the plan and candidate from its delivery after a new candidate is built', async t => {
+  const f = fixture(t);
+  const delivered = f.candidate(f.completeDirectly(f.task('development')));
+  const guide = f.guide(delivered);
+  const report = f.recordTest(f.completeDirectly(f.task('testing')), delivered, guide, true);
+  const delivery = f.core.acceptDelivery(f.input({
+    candidateVersion: delivered.version, contentRef: delivered.contentRef, guideVersion: guide.version,
+    reportRef: report.reportRef, confirmationRef: 'operator-accept',
+  }), f.authority);
+  const nextPlan = f.confirm(f.propose('Changes for the next release'));
+  const nextCandidate = f.candidate(f.completeDirectly(f.task('development')), 'git:' + 'b'.repeat(40));
+  assert.equal(f.state().plans.at(-1).version, nextPlan.version);
+  assert.equal(f.state().candidate.version, nextCandidate.version);
+
+  const runtime = createRuntime({
+    coordinator: f.core,
+    adapters: [f.adapter(({ context }) => ({
+      output: {
+        projectStage: context.project.stage, planVersion: context.plan.version, planDigest: context.plan.digest,
+        candidateVersion: context.candidate.version, contentRef: context.candidate.contentRef,
+        deliveryId: context.delivery.id, reportRef: context.candidate.test.reportRef,
+      },
+    }))],
+  });
+  const result = await runtime.start(f.startRequest(f.task('support', { deliveryId: delivery.id }))).done;
+  assert.equal(result.outcome, 'completed');
+  assert.deepEqual(result.output, {
+    projectStage: 'documentation', planVersion: f.originalPlan.version, planDigest: f.originalPlan.digest,
+    candidateVersion: delivered.version, contentRef: delivered.contentRef, deliveryId: delivery.id, reportRef: report.reportRef,
+  });
 });
 
 test('cancellation closes queued tools before invocation', async t => {
@@ -393,7 +484,7 @@ test('handler and adapter failures preserve stable error codes without exposing 
 });
 
 test('a real Node process holding the workspace receives cancellation and must exit before release', { timeout: 10_000 }, async t => {
-  const f = fixture(t, 'cli');
+  const f = fixture(t, { backend: 'cli' });
   const ready = deferred();
   const notified = deferred();
   let child;

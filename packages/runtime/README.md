@@ -4,7 +4,7 @@
 
 ## Starting an execution
 
-Trusted control-plane code calls `runtime.start({commandId, projectId, taskId, expectedTaskVersion, adapterId, leaseMs})` and receives an opaque `{cancel(), done}` handle. Exact start retries return the same handle. A changed input under the same command ID throws `START_CONFLICT`. The coordinator derives the agent ID from the task's registered role. Model-reported identities and extra start fields are rejected.
+Trusted control-plane code calls `runtime.start({commandId, projectId, taskId, expectedTaskVersion, adapterId, leaseMs})` and receives an opaque `{cancel(), done}` handle. Exact start retries return the same handle. A changed input under the same command ID throws `START_CONFLICT`. The runtime derives the agent ID from the task's registered role in core. Model-reported identities and extra start fields are rejected. Immediately before starting the adapter, the runtime checks the run versions and asks core whether the task kind is still eligible to dispatch.
 
 Register an adapter as `{id, backend, model, allToolsMediated, execute}`. The configured model and backend must match the role profile. `allToolsMediated: true` is a trusted registration assertion about an audited adapter. Register it only if every model tool request is routed through the broker and the underlying runner has disabled or mediated its built-in tools. An adapter with uncontrolled built-in search or other tools is rejected by this execution path. This runtime relies on the host's adapter registration and OS/provider controls to enforce that assertion.
 
@@ -13,10 +13,10 @@ The adapter contract is `execute({context, signal, callTool})`. Return or resolv
 | Field | Contents |
 | --- | --- |
 | `project` | `id`, `goal`, `constraints`, `stage` |
-| `plan` | Applicable version, digest, summary, scope, architecture, sources, work items, acceptance criteria and confirmation state, or `null` |
+| `plan` | Applicable version, digest, summary, scope, architecture, sources, work items, acceptance criteria and confirmation state, or `null`. Support receives the plan from its accepted delivery. |
 | `task` | ID, title, kind, dependency IDs and canonical workspace, where applicable |
 | `profile` | Registered profile ID, role, backend, model and canonical tool capabilities |
-| `candidate` | Candidate pinned to the claim, or `null` |
+| `candidate` | Candidate pinned to the claim or support delivery, or `null` |
 | `delivery` | Delivery pinned to a support claim, or `null` |
 
 The adapter receives an abort signal and the broker function. Keep the adapter's tool names and provider schemas in trusted configuration and align their names with the host registry. `profile.tools` supplies canonical capability metadata for constructing model requests. It does not carry tool definitions, handlers or authority.
