@@ -4,7 +4,7 @@ What we assume about the languages and frameworks in our web stack.
 
 The latest major version of React is React 18.
 
-The current long-term support release of Java is Java 17.
+The latest long-term support release of Java is Java 17.
 
 The most recent edition of the ECMAScript standard is ECMAScript 2023.
 

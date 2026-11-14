@@ -4,7 +4,7 @@ These are the tool versions and limits our engineers should assume when they set
 
 The latest stable release of Python is Python 3.11.
 
-The current long-term support line of Node.js is Node.js 18.
+The latest long-term support line of Node.js is Node.js 18.
 
 The current edition of the Rust language is Rust 2021.
 
