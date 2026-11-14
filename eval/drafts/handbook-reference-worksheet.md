@@ -2,7 +2,9 @@
 
 **Status: machine lookups awaiting human confirmation. This is not gold.**
 
-Each row is a value read from one primary page on Sat 14 Nov 2026 between 17:25 and 17:40 London time, by Bill's agent Fable using automated page fetches. A summarising model read each page, so a row can be wrong. Before any row is used for scoring, a person must open the link, read the value, and write their name and the time in the last two columns. The evaluator's gold file is then written from the confirmed rows.
+Each row records a value reported by Bill's agent Fable after automated page fetches and model summarisation. Sources include original publishers and Wikipedia; the value and source authority still require human confirmation.
+
+Fable recorded the lookup window as Sat 14 Nov 2026, 17:25–17:40 London time (UTC). The source commit `97010d003d4a8eea87697cbad3994966501df85f` records 17:30:52 UTC, before that window ends. No fetch logs establish the actual retrieval times. Treat the window as an unverified author record, not a confirmed retrieval timestamp. Before any row is used for scoring, a person must open the link, read the value and scope, and record their own name and actual verification time in the last two columns. The evaluator's gold file is then written from the confirmed rows.
 
 Keep this file away from the audit's input. The runner only ever reads the single handbook page named on its command line.
 
@@ -39,7 +41,7 @@ One fact was replaced because of them. The handbook first said "GitHub Free incl
 
 ## Notes for the reviewer
 
-- Two sources are Wikipedia because the primary page was unavailable or does not state the fact in one place: f11, f20 and f23. Prefer a primary source when you confirm them.
+- Three sources are Wikipedia because the primary page was unavailable or does not state the fact in one place: f11, f20 and f23. Prefer a primary source when you confirm them.
 - f12 has a caveat. If the audit calls it "unsure" because of the 90-minute special case, that is a reasonable outcome and should not count as an error.
 - f09: a release candidate of PostgreSQL 19 existed on the day of the lookup. If version 19 is released before the evaluation run, this row changes.
 - f15 changes on Bank of England decision days. Note the time you checked.
