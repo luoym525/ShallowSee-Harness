@@ -9,7 +9,7 @@ import { parseEventLog } from '../../apps/server/log-reader.mjs';
 import { buildAudit } from '../../apps/web/model.mjs';
 import { assessment, cleanSources, documentLines, includesValue, makeDiff, normalizeClaims } from './checks.mjs';
 import { createAnthropicProvider, createLinkupProvider, ProviderError } from './providers.mjs';
-import { runDirect } from './runner.mjs';
+import { runDirect, timeBudgetSeconds } from './runner.mjs';
 import { syntheticFixture } from './cli.mjs';
 
 async function withDir(fn) {
@@ -239,4 +239,53 @@ test('the exact byte limit accepts a multibyte character split across chunks', a
   }) });
   assert.deepEqual(await linkup({ query: 'scope', depth: 'standard' }), { answer, sources: [] });
   assert.equal(stream.locked, false);
+});
+
+test('model requests leave room for thinking and use an explicitly supported nullable type', async () => {
+  const bodies = [];
+  const api = createAnthropicProvider({ apiKey: 'fixture-key', model: 'fixture-model', async fetchImpl(url, init) {
+    bodies.push(JSON.parse(init.body));
+    const text = bodies.length === 1 ? '{"claims":[]}' : '{"verdict":"unsure","currentValue":null,"sourceIndexes":[],"rationale":"weak"}';
+    return Response.json({ model: 'fixture-resolved', stop_reason: 'end_turn', usage: { input_tokens: 1, output_tokens: 1 }, content: [{ type: 'text', text }] });
+  } });
+  await api.extract({ lines: [], maxClaims: 1 });
+  const verdict = await api.verify({ claim: {}, sources: [], observedAt: '2026-11-14T00:00:00.000Z' });
+  assert.equal(verdict.value.currentValue, null);
+  assert.deepEqual(bodies.map(body => body.max_tokens), [16000, 16000]);
+  assert.deepEqual(bodies[1].output_config.format.schema.properties.currentValue, { anyOf: [{ type: 'string' }, { type: 'null' }] });
+  assert.ok(!JSON.stringify(bodies).includes('"type":["string","null"]'));
+});
+
+test('a reply cut off by the output cap is reported as incomplete, never parsed', async () => {
+  const api = createAnthropicProvider({ apiKey: 'fixture-key', model: 'fixture-model', async fetchImpl() {
+    return Response.json({ model: 'fixture-resolved', stop_reason: 'max_tokens', usage: { input_tokens: 9, output_tokens: 16000 }, content: [{ type: 'text', text: '{"claims":[' }] });
+  } });
+  await assert.rejects(api.extract({ lines: [], maxClaims: 1 }), error =>
+    error.code === 'anthropic_incomplete' && error.result.stopReason === 'max_tokens' && error.result.usage.outputTokens === 16000);
+});
+
+test('standalone requests use their provider deadline and honor a shorter remaining budget', async t => {
+  const timeouts = [];
+  const makeSignal = AbortSignal.timeout;
+  t.mock.method(AbortSignal, 'timeout', ms => {
+    timeouts.push(ms);
+    return makeSignal(ms);
+  });
+  const api = createAnthropicProvider({ apiKey: 'fixture-key', model: 'fixture-model', async fetchImpl() {
+    return Response.json({ model: 'fixture', stop_reason: 'end_turn', content: [{ type: 'text', text: '{"claims":[]}' }] });
+  } });
+  const linkup = createLinkupProvider({ apiKey: 'fixture-key', fetchImpl: async () => Response.json({ sources: [] }) });
+  await api.extract({ lines: [], maxClaims: 1 });
+  await api.extract({ lines: [], maxClaims: 1, timeoutMs: 2500 });
+  await linkup({ query: 'scope', depth: 'standard' });
+  assert.deepEqual(timeouts, [120000, 2500, 45000]);
+});
+
+test('the time budget grows with the number of claims and is recorded in the room limits', async () => {
+  assert.deepEqual([1, 4, 12].map(timeBudgetSeconds), [135, 360, 960]);
+  await withDir(async root => {
+    const { events } = await logged(root, { maxClaims: 8 });
+    assert.equal(events[0].payload.limits.maxMinutes, 11);
+    assert.equal(events[0].payload.limits.maxRuns, 41);
+  });
 });

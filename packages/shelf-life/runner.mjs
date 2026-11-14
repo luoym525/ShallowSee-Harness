@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
 import { assessment, cleanAnswer, cleanSources, documentLines, makeDiff, normalizeClaims, queryFor } from './checks.mjs';
 import { ProviderError } from './providers.mjs';
+import { PUBLISH_TIMEOUT_MS } from './publish.mjs';
 
 const SYSTEM = { memberId: null, role: 'system', mode: 'system', provider: null, model: null, identitySource: 'configured' };
 const UNKNOWN = { inputTokens: null, outputTokens: null, costUsd: null, source: 'unknown' };
@@ -9,7 +10,9 @@ const ROOM_VERSION = 1;
 const TASK_ID = 'task_audit';
 const MAX_CLAIMS = 12;
 const DEFAULT_CLAIMS = 4;
-const VERIFY_TIMEOUT = 180;
+// One minute for extraction and bookkeeping, plus 75 seconds per claim: up to three
+// searches and two model verdicts, run one after another.
+export const timeBudgetSeconds = maxClaims => 60 + 75 * maxClaims;
 const elapsed = t => Math.max(0, Math.round(performance.now() - t));
 const errorCode = error => error instanceof ProviderError ? error.code : 'invalid_provider_output';
 const safeError = error => error instanceof ProviderError ? error.message : 'The operation returned invalid data or failed.';
@@ -26,21 +29,25 @@ function member(provenance, displayName) {
 
 export async function runDirect({
   writer, doc, markdown, modelProvider, searchProvider,
-  maxClaims = DEFAULT_CLAIMS, synthetic = false, now = () => new Date(),
+  maxClaims = DEFAULT_CLAIMS, synthetic = false, now = () => new Date(), publisher = null,
 }) {
   const lines = documentLines(doc, markdown);
   if (!writer || typeof writer.append !== 'function' || typeof modelProvider?.extract !== 'function'
       || typeof modelProvider?.verify !== 'function' || typeof searchProvider !== 'function') throw new Error('Audit requires writer, extraction, verification and search providers.');
   if (!synthetic && (typeof modelProvider.model !== 'string' || !modelProvider.model.trim())) throw new Error('Configure the model provenance for a live audit.');
   if (!Number.isSafeInteger(maxClaims) || maxClaims < 1 || maxClaims > MAX_CLAIMS) throw new Error('maxClaims must be an integer from 1 to ' + MAX_CLAIMS + '.');
+  if (publisher !== null && typeof publisher !== 'function') throw new Error('publisher must be a function when it is provided.');
+  if (synthetic && publisher) throw new Error('Synthetic audits cannot publish corrections.');
 
   const observedAt = now().toISOString();
   const documentSha256 = createHash('sha256').update(markdown).digest('hex');
-  const deadline = performance.now() + VERIFY_TIMEOUT * 1000;
-  const maxRuns = 1 + maxClaims * 5;
+  const budgetSeconds = timeBudgetSeconds(maxClaims);
+  const deadline = performance.now() + budgetSeconds * 1000;
+  const maxRuns = 1 + maxClaims * 5 + (publisher ? 1 : 0);
   const researcher = provider(modelProvider.model, 'anthropic', 'm_researcher', 'researcher', synthetic);
   const reviewer = provider(modelProvider.model, 'anthropic', 'm_reviewer', 'reviewer', synthetic);
   const searcher = provider(null, 'linkup', 'm_linkup', 'researcher', synthetic);
+  const builder = { memberId: 'm_publisher', role: 'builder', mode: 'system', provider: 'github', model: null, identitySource: 'configured' };
   const emit = (type, payload, options = {}) => writer.append({
     type, provenance: SYSTEM, payload, ...options,
   });
@@ -48,13 +55,16 @@ export async function runDirect({
   const room = await emit('room.created', {
     goal: 'Audit time-sensitive claims in ' + doc,
     acceptanceCriteria: ['Each supported correction is proposed with cited review evidence.', 'Evidence gaps stay visible for human review.'],
-    constraints: ['Read-only input and external sources.', 'No automatic application or publication of corrections.'],
-    limits: { maxRuns, maxMinutes: VERIFY_TIMEOUT / 60, maxUsd: null },
+    constraints: ['Read-only input and external sources.', publisher
+      ? 'Corrections are published as a new branch and optional pull request for human review. Merging requires a person.'
+      : 'No automatic application or publication of corrections.'],
+    limits: { maxRuns, maxMinutes: (budgetSeconds + (publisher ? PUBLISH_TIMEOUT_MS / 1000 : 0)) / 60, maxUsd: null },
     workflow: 'shelf-life', driver: 'direct', roomVersion: ROOM_VERSION, ...(synthetic ? { synthetic: true } : {}),
   });
   await emit('member.joined', member(researcher, synthetic ? 'Synthetic extractor' : 'Anthropic extractor'));
   await emit('member.joined', member(reviewer, synthetic ? 'Synthetic verifier' : 'Anthropic verifier'));
   await emit('member.joined', member(searcher, synthetic ? 'Synthetic search' : 'Linkup search'));
+  if (publisher) await emit('member.joined', member(builder, 'Pull request publisher'));
   const started = await task('task.created', {
     title: 'Generate a cited audit for ' + doc, owner: null, dependencies: [], inputs: { doc, documentSha256 },
     deliverables: ['Claim verdicts', 'Optional scoped patch for review'],
@@ -128,6 +138,54 @@ export async function runDirect({
     return result;
   }
 
+  // Publishes the validated patch as a branch and, when possible, a pull request.
+  // A pull request is recorded only when the publisher returns a real number and address.
+  async function publish(patchEvent, edits, diff, artifactIds) {
+    if (++runCount > maxRuns) return null;
+    const runId = randomUUID();
+    const runOptions = { runId, taskId: TASK_ID, provenance: builder };
+    const toolCallId = randomUUID();
+    const name = 'open_pull_request';
+    const claimIds = edits.map(e => e.claimId);
+    const evidence = [{ kind: 'check', ref: patchEvent.eventId, summary: 'The published change is the patch that passed the patch_scope check.', passed: true }];
+    await emit('run.started', { memberId: builder.memberId, provider: builder.provider, model: null, attempt: 1, triggerEventId: patchEvent.eventId, roomVersion: ROOM_VERSION }, runOptions);
+    await emit('tool.called', { toolCallId, name, args: { doc, claimIds } }, runOptions);
+    const t = performance.now();
+    let result;
+    try {
+      result = await publisher({ roomId: room.roomId, doc, documentSha256, diff, timeoutMs: PUBLISH_TIMEOUT_MS,
+        corrections: edits.map(({ claimId, line, oldValue, currentValue, sources }) => ({ claimId, line, oldValue, currentValue, sources })) });
+      if (!result || !/^[0-9a-f]{40}$/u.test(result.commit) || typeof result.branch !== 'string' || typeof result.repo !== 'string'
+          || typeof result.compareUrl !== 'string' || !result.compareUrl.startsWith('https://')) throw new ProviderError('publish_output', 'The publisher did not return a branch and commit.');
+    } catch (error) {
+      const info = { code: error instanceof ProviderError ? error.code : 'publish_failed', message: safeError(error) };
+      await emit('tool.result', { toolCallId, name, status: 'error', summary: info.message, durationMs: elapsed(t) }, runOptions);
+      await emit('run.failed', { error: info, retryable: error instanceof ProviderError && error.retryable, usage: UNKNOWN, durationMs: elapsed(t) }, runOptions);
+      return null;
+    }
+    const { repo, branch, commit, compareUrl } = result;
+    const opened = Number.isSafeInteger(result.number) && result.number > 0 && typeof result.url === 'string' && result.url.startsWith('https://');
+    if (opened) {
+      const artifactId = 'pr_' + result.number;
+      await emit('tool.result', { toolCallId, name, status: 'ok', summary: 'Pull request #' + result.number + ' opened for review.', durationMs: elapsed(t) }, runOptions);
+      await emit('shelflife.pr.opened', { repo, number: result.number, url: result.url, branch, commit, claimIds }, runOptions);
+      await emit('artifact.registered', { artifactId, kind: 'pull_request', location: result.url, version: commit, evidence }, { taskId: TASK_ID, provenance: builder });
+      await emit('run.completed', { stopReason: null, usage: UNKNOWN, durationMs: elapsed(t) }, runOptions);
+      artifactIds.push(artifactId);
+      return { repo, branch, commit, number: result.number, url: result.url, compareUrl };
+    }
+    const artifactId = 'branch_' + commit.slice(0, 12);
+    const failed = !!result.prError && typeof result.prError.code === 'string';
+    const summary = failed ? 'The branch was pushed, but no pull request was confirmed: ' + String(result.prError.message)
+      : 'The branch was pushed. No token was configured, so no pull request was opened.';
+    await emit('tool.result', { toolCallId, name, status: failed ? 'error' : 'ok', summary, durationMs: elapsed(t) }, runOptions);
+    await emit('artifact.registered', { artifactId, kind: 'patch', location: compareUrl, version: commit, evidence }, { taskId: TASK_ID, provenance: builder });
+    if (failed) await emit('run.failed', { error: { code: result.prError.code, message: String(result.prError.message) }, retryable: false, usage: UNKNOWN, durationMs: elapsed(t) }, runOptions);
+    else await emit('run.completed', { stopReason: null, usage: UNKNOWN, durationMs: elapsed(t) }, runOptions);
+    artifactIds.push(artifactId);
+    return { repo, branch, commit, number: null, url: null, compareUrl };
+  }
+
   try {
     const extracted = await modelRun(researcher, started.eventId, 1, 'Claim extraction',
       timeoutMs => modelProvider.extract({ lines: lines.map((text, i) => ({ line: i + 1, text })), maxClaims, timeoutMs }),
@@ -176,13 +234,16 @@ export async function runDirect({
       }
       const finalEvent = await emit('shelflife.verdict.final', { claimId: claim.claimId, ...verdict }, { taskId: TASK_ID });
       final.push({ claimId: claim.claimId, verdict: verdict.verdict, eventId: finalEvent.eventId });
-      if (verdict.verdict === 'stale') edits.push({ claimId: claim.claimId, line: claim.lineStart, quote: claim.quote, correction: verdict.correction });
+      if (verdict.verdict === 'stale') edits.push({ claimId: claim.claimId, line: claim.lineStart, quote: claim.quote, correction: verdict.correction,
+        oldValue: claim.oldValue, currentValue: verdict.currentValue, sources: verdict.sources });
     }
     const diff = makeDiff(doc, lines, edits, markdown);
-    if (diff) await emit('shelflife.patch.proposed', { doc, documentSha256, claimIds: edits.map(e => e.claimId), diff }, { taskId: TASK_ID });
-    await task('task.review', { requestedBy: reviewer.memberId, artifactIds: [], version: 3 });
+    const patchEvent = diff ? await emit('shelflife.patch.proposed', { doc, documentSha256, claimIds: edits.map(e => e.claimId), diff }, { taskId: TASK_ID }) : null;
+    const artifactIds = [];
+    const publication = patchEvent && publisher ? await publish(patchEvent, edits, diff, artifactIds) : null;
+    await task('task.review', { requestedBy: reviewer.memberId, artifactIds, version: 3 });
     await emit('room.closed', { status: 'completed', summary: final.length + ' findings; corrections and unresolved claims await human review.' });
-    return { roomId: room.roomId, driver: 'direct', synthetic, doc, documentSha256, claimCount: final.length, rejectedClaims: rejected, failedSearches, findings: final, diff, status: 'completed' };
+    return { roomId: room.roomId, driver: 'direct', synthetic, doc, documentSha256, claimCount: final.length, rejectedClaims: rejected, failedSearches, findings: final, diff, publication, status: 'completed' };
   } catch (error) {
     if (error?.name === 'EventLogError') throw error;
     await task('task.failed', { reason: safeError(error), version: 3 });
