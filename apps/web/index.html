@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Shelf Life · Document trust</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to audit</a>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Shelf Life home"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span><span>Shelf Life<small>DOCUMENT TRUST WORKBENCH</small></span></a>
+    <div class="top-actions"><span id="connection" class="connection"><i></i>Connecting</span><button id="refresh" class="button button-dark" type="button">Refresh runs <span aria-hidden="true">↻</span></button></div>
+  </header>
+  <div class="layout">
+    <aside class="sidebar" aria-label="Audit selection">
+      <p class="eyebrow">YOUR WORKSPACE</p>
+      <h2>Document audits</h2>
+      <p class="muted small">Every conclusion, with its trail of evidence.</p>
+      <label class="select-label" for="room-picker">Choose a saved run</label>
+      <select id="room-picker"><option value="">Loading runs…</option></select>
+      <p id="room-id" class="mono muted small break">No run selected</p>
+      <div class="sidebar-divider"></div>
+      <p class="eyebrow">WORKFLOW</p>
+      <ol class="workflow"><li><span>01</span><div>Find claims<small>Read the source document</small></div></li><li><span>02</span><div>Verify evidence<small>Check current, cited sources</small></div></li><li><span>03</span><div>Propose a change<small>Keep uncertain facts untouched</small></div></li><li><span>04</span><div>Review &amp; accept<small>Inspect the artifact and evidence</small></div></li></ol>
+      <div class="sidebar-note"><span aria-hidden="true">↗</span><p>Answers end a run.<br><strong>Evidence completes the work.</strong></p></div>
+      <div class="sidebar-bottom"><span class="tiny-dot"></span> ShallowSee Harness <span class="version">v0.1</span></div>
+    </aside>
+    <main id="main">
+      <div id="error" class="alert error" role="alert" hidden></div>
+      <div id="warnings" class="alert warning" hidden></div>
+      <section class="hero">
+        <div class="hero-top"><p class="eyebrow">A CLEARER RECORD</p><div id="badges" class="badges"></div></div>
+        <h1>Keep your knowledge<br><em>up to date.</em></h1>
+        <p id="goal" class="goal">Select a run to inspect its findings, sources and review history.</p>
+        <div id="run-meta" class="run-meta"></div>
+      </section>
+      <div id="provenance-banner" class="provenance-banner" hidden></div>
+      <section id="summary" class="summary-grid" aria-label="Audit overview"></section>
+      <nav class="tabs" role="tablist" aria-label="Audit views"><button id="tab-timeline" class="tab active" role="tab" type="button" data-tab="timeline" aria-controls="panel-timeline" aria-selected="true">Run timeline <span id="timeline-count">0</span></button><button id="tab-findings" class="tab" role="tab" type="button" data-tab="findings" aria-controls="panel-findings" aria-selected="false" tabindex="-1">Findings &amp; sources <span id="finding-count">0</span></button><button id="tab-reliability" class="tab" role="tab" type="button" data-tab="reliability" aria-controls="panel-reliability" aria-selected="false" tabindex="-1">Reliability</button></nav>
+      <section id="panel-timeline" class="tab-panel" role="tabpanel" aria-labelledby="tab-timeline" tabindex="0"><div class="section-heading"><div><h2>A visible chain of work</h2><p>Public progress, tools and recorded acceptance.</p></div><span id="cursor" class="mono muted small">Cursor 0</span></div><div id="timeline" class="timeline"></div></section>
+      <section id="panel-findings" class="tab-panel" role="tabpanel" aria-labelledby="tab-findings" tabindex="0" hidden><div class="section-heading"><div><h2>Facts, checked against evidence</h2><p>Final verdicts are separate from proposals and open questions.</p></div></div><div id="findings" class="findings"></div><div id="changes"></div></section>
+      <section id="panel-reliability" class="tab-panel" role="tabpanel" aria-labelledby="tab-reliability" tabindex="0" hidden><div class="section-heading"><div><h2>What the record can prove</h2><p>Observed events only. Unknown usage stays unknown.</p></div></div><div id="reliability"></div></section>
+      <footer class="footer"><span>Shelf Life / ShallowSee</span><span id="footer-meta">Read-only audit viewer</span></footer>
+    </main>
+  </div>
+</body>
+</html>

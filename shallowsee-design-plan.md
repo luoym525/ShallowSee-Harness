@@ -2,6 +2,8 @@
 
 *Autonomous Agents track, Imperial AI Hack. Written 14 November 2026. 本文为结构设计与待开发计划，时间均采用 Europe/London。格式参考仓库中的 Fable 方案，团队执行以共同确认的接口与里程碑为准。*
 
+> **14:13 后的范围更新：** 用户已选择优先实现 Fable 的 Shelf Life 核查工作流，并授权编码与推送；通用协作平台和本地 0.5B 路由后置。本文保留为后续架构参考，当前执行范围见 [协作记录的最新决定](coordination-notes.md)。项目分歧以 Fable 的判断为准，无分歧时平级协作。
+
 ## Outline
 
 **一句话定位**

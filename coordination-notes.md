@@ -2,6 +2,16 @@
 
 *14 November 2026, Europe/London. Discussion snapshot, not a declaration that the product is implemented or the team has approved every proposal. Companion to [the architecture plan](shallowsee-design-plan.md).*
 
+## Latest user decision — 14:13–14:14
+
+The user has selected **Fable's Shelf Life fact-checking workflow as the immediate product**. The general collaboration platform and local router are deferred. The user explicitly authorized implementation and Git pushes, replacing the earlier design-only limit.
+
+For project decisions, Fable's judgment resolves disagreements with the Codex coordinator; otherwise they collaborate as peers. This does not turn proposed features or untested integrations into completed work.
+
+The Codex implementation now focuses on a local event-log service and workbench showing the workflow, findings with sources, reliability evidence, and clearly labeled replay. Fable owns the workflow and shared contract. Final repository paths and integration details are coordinated in the meeting.
+
+The earlier platform scaffold has been preserved separately and is not the active product. The local-router experiment below remains a preliminary record for the deferred work. The remaining sections describe the earlier discussion snapshot; where they differ, this update takes precedence.
+
 ## Outline
 
 The detailed architecture plan was shared in the ShallowSeek meeting. The discussion reconciled two proposals: a general multi-model collaboration platform and Fable's Shelf Life workflow for detecting and repairing outdated documentation.
