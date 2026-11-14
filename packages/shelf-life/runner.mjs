@@ -9,7 +9,9 @@ const ROOM_VERSION = 1;
 const TASK_ID = 'task_audit';
 const MAX_CLAIMS = 12;
 const DEFAULT_CLAIMS = 4;
-const VERIFY_TIMEOUT = 180;
+// One minute for extraction and bookkeeping, plus 75 seconds per claim: up to three
+// searches and two model verdicts, run one after another.
+export const timeBudgetSeconds = maxClaims => 60 + 75 * maxClaims;
 const elapsed = t => Math.max(0, Math.round(performance.now() - t));
 const errorCode = error => error instanceof ProviderError ? error.code : 'invalid_provider_output';
 const safeError = error => error instanceof ProviderError ? error.message : 'The operation returned invalid data or failed.';
@@ -37,7 +39,8 @@ export async function runDirect({
 
   const observedAt = now().toISOString();
   const documentSha256 = createHash('sha256').update(markdown).digest('hex');
-  const deadline = performance.now() + VERIFY_TIMEOUT * 1000;
+  const budgetSeconds = timeBudgetSeconds(maxClaims);
+  const deadline = performance.now() + budgetSeconds * 1000;
   const maxRuns = 1 + maxClaims * 5 + (publisher ? 1 : 0);
   const researcher = provider(modelProvider.model, 'anthropic', 'm_researcher', 'researcher', synthetic);
   const reviewer = provider(modelProvider.model, 'anthropic', 'm_reviewer', 'reviewer', synthetic);
@@ -53,7 +56,7 @@ export async function runDirect({
     constraints: ['Read-only input and external sources.', publisher
       ? 'Corrections are published only as a pull request for a person to approve. Nothing is merged automatically.'
       : 'No automatic application or publication of corrections.'],
-    limits: { maxRuns, maxMinutes: VERIFY_TIMEOUT / 60, maxUsd: null },
+    limits: { maxRuns, maxMinutes: budgetSeconds / 60, maxUsd: null },
     workflow: 'shelf-life', driver: 'direct', roomVersion: ROOM_VERSION, ...(synthetic ? { synthetic: true } : {}),
   });
   await emit('member.joined', member(researcher, synthetic ? 'Synthetic extractor' : 'Anthropic extractor'));
