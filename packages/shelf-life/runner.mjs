@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
 import { assessment, cleanAnswer, cleanSources, documentLines, makeDiff, normalizeClaims, queryFor } from './checks.mjs';
 import { ProviderError } from './providers.mjs';
+import { PUBLISH_TIMEOUT_MS } from './publish.mjs';
 
 const SYSTEM = { memberId: null, role: 'system', mode: 'system', provider: null, model: null, identitySource: 'configured' };
 const UNKNOWN = { inputTokens: null, outputTokens: null, costUsd: null, source: 'unknown' };
@@ -36,6 +37,7 @@ export async function runDirect({
   if (!synthetic && (typeof modelProvider.model !== 'string' || !modelProvider.model.trim())) throw new Error('Configure the model provenance for a live audit.');
   if (!Number.isSafeInteger(maxClaims) || maxClaims < 1 || maxClaims > MAX_CLAIMS) throw new Error('maxClaims must be an integer from 1 to ' + MAX_CLAIMS + '.');
   if (publisher !== null && typeof publisher !== 'function') throw new Error('publisher must be a function when it is provided.');
+  if (synthetic && publisher) throw new Error('Synthetic audits cannot publish corrections.');
 
   const observedAt = now().toISOString();
   const documentSha256 = createHash('sha256').update(markdown).digest('hex');
@@ -45,7 +47,7 @@ export async function runDirect({
   const researcher = provider(modelProvider.model, 'anthropic', 'm_researcher', 'researcher', synthetic);
   const reviewer = provider(modelProvider.model, 'anthropic', 'm_reviewer', 'reviewer', synthetic);
   const searcher = provider(null, 'linkup', 'm_linkup', 'researcher', synthetic);
-  const builder = { memberId: 'm_publisher', role: 'builder', mode: 'system', provider: synthetic ? null : 'github', model: null, identitySource: 'configured' };
+  const builder = { memberId: 'm_publisher', role: 'builder', mode: 'system', provider: 'github', model: null, identitySource: 'configured' };
   const emit = (type, payload, options = {}) => writer.append({
     type, provenance: SYSTEM, payload, ...options,
   });
@@ -54,15 +56,15 @@ export async function runDirect({
     goal: 'Audit time-sensitive claims in ' + doc,
     acceptanceCriteria: ['Each supported correction is proposed with cited review evidence.', 'Evidence gaps stay visible for human review.'],
     constraints: ['Read-only input and external sources.', publisher
-      ? 'Corrections are published only as a pull request for a person to approve. Nothing is merged automatically.'
+      ? 'Corrections are published as a new branch and optional pull request for human review. Merging requires a person.'
       : 'No automatic application or publication of corrections.'],
-    limits: { maxRuns, maxMinutes: budgetSeconds / 60, maxUsd: null },
+    limits: { maxRuns, maxMinutes: (budgetSeconds + (publisher ? PUBLISH_TIMEOUT_MS / 1000 : 0)) / 60, maxUsd: null },
     workflow: 'shelf-life', driver: 'direct', roomVersion: ROOM_VERSION, ...(synthetic ? { synthetic: true } : {}),
   });
   await emit('member.joined', member(researcher, synthetic ? 'Synthetic extractor' : 'Anthropic extractor'));
   await emit('member.joined', member(reviewer, synthetic ? 'Synthetic verifier' : 'Anthropic verifier'));
   await emit('member.joined', member(searcher, synthetic ? 'Synthetic search' : 'Linkup search'));
-  if (publisher) await emit('member.joined', member(builder, synthetic ? 'Synthetic publisher' : 'Pull request publisher'));
+  if (publisher) await emit('member.joined', member(builder, 'Pull request publisher'));
   const started = await task('task.created', {
     title: 'Generate a cited audit for ' + doc, owner: null, dependencies: [], inputs: { doc, documentSha256 },
     deliverables: ['Claim verdicts', 'Optional scoped patch for review'],
@@ -151,7 +153,7 @@ export async function runDirect({
     const t = performance.now();
     let result;
     try {
-      result = await publisher({ roomId: room.roomId, doc, documentSha256, diff,
+      result = await publisher({ roomId: room.roomId, doc, documentSha256, diff, timeoutMs: PUBLISH_TIMEOUT_MS,
         corrections: edits.map(({ claimId, line, oldValue, currentValue, sources }) => ({ claimId, line, oldValue, currentValue, sources })) });
       if (!result || !/^[0-9a-f]{40}$/u.test(result.commit) || typeof result.branch !== 'string' || typeof result.repo !== 'string'
           || typeof result.compareUrl !== 'string' || !result.compareUrl.startsWith('https://')) throw new ProviderError('publish_output', 'The publisher did not return a branch and commit.');
@@ -174,7 +176,7 @@ export async function runDirect({
     }
     const artifactId = 'branch_' + commit.slice(0, 12);
     const failed = !!result.prError && typeof result.prError.code === 'string';
-    const summary = failed ? 'The branch was pushed, but the pull request was not opened: ' + String(result.prError.message)
+    const summary = failed ? 'The branch was pushed, but no pull request was confirmed: ' + String(result.prError.message)
       : 'The branch was pushed. No token was configured, so no pull request was opened.';
     await emit('tool.result', { toolCallId, name, status: failed ? 'error' : 'ok', summary, durationMs: elapsed(t) }, runOptions);
     await emit('artifact.registered', { artifactId, kind: 'patch', location: compareUrl, version: commit, evidence }, { taskId: TASK_ID, provenance: builder });

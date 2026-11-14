@@ -63,7 +63,7 @@ async function readResponseJson(response, label) {
   }
 }
 
-async function post(fetchImpl, url, headers, body, label, timeoutMs = REQUEST_TIMEOUT_MS, limitMs = REQUEST_TIMEOUT_MS) {
+async function post(fetchImpl, url, headers, body, label, timeoutMs, limitMs = REQUEST_TIMEOUT_MS) {
   let response;
   try {
     response = await fetchImpl(url, {
@@ -71,7 +71,7 @@ async function post(fetchImpl, url, headers, body, label, timeoutMs = REQUEST_TI
       redirect: 'error',
       headers: { 'Content-Type': 'application/json', ...headers },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(Math.min(limitMs, timeoutMs)),
+      signal: AbortSignal.timeout(Math.min(limitMs, timeoutMs ?? limitMs)),
     });
     if (!response.ok) {
       const status = response.status;

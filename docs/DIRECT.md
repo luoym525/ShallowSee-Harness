@@ -2,7 +2,7 @@
 
 The direct runner reads one public Markdown file, extracts time-sensitive claims, searches Linkup and proposes narrow corrections. It writes a v1 event log that the workbench can display. By default it leaves the original file untouched and places the audit in review. With `--open-pr` it also publishes the validated patch as a new branch and a pull request for a person to approve. It never merges anything.
 
-Node.js 20 or later; no packages need installation. Git is used only by tests that check patch compatibility.
+Use Node.js 20 or later. Git is required for `--open-pr` and for tests that check patch compatibility.
 
 ## Try it offline
 
@@ -29,9 +29,9 @@ Add `--open-pr` to publish the validated patch for review:
 
     node --env-file=.env packages/shelf-life/cli.mjs --open-pr --max-claims 8 --doc-label handbook/developer-tooling.md handbook/developer-tooling.md
 
-The publisher works on the Git checkout in the current directory, or the one named by `--repo-dir`. It fetches the base branch `main`, checks that the audited file is byte for byte the file on that branch, builds one commit with a temporary index, and pushes it to a new branch named `shelf-life/<page>-<room>`. It does not check out, switch, stage or change anything in your working tree. It never pushes to `main` and never forces.
+The publisher uses the Git checkout in the current directory or the one named by `--repo-dir`. Set `SHELFLIFE_HANDBOOK_REPO=owner/name`. The effective `origin` configuration must have exactly one fetch URL and one push URL, both naming that repository on `github.com` via HTTPS or Git SSH. The publisher fetches `main`, verifies the audited file's SHA-256 against that base, and builds one commit with a temporary index. It creates a new `shelf-life/<page>-<room>` branch. If another push creates that branch first, publication stops and leaves the branch in place. The temporary push hook also runs the checkout's existing executable pre-push hook. Git uses the checkout's normal authentication for the push.
 
-With `GITHUB_TOKEN` set to a token that may open pull requests on the repository, it then opens a pull request whose description lists each change with its sources. `SHELFLIFE_HANDBOOK_REPO=owner/name` selects the repository; without it, the `origin` remote decides. Without a token only the branch is pushed, and the report gives a compare link so a person can open the pull request by hand.
+Publication has a separate 90-second budget for Git operations and the optional API request, in addition to the audit budget. Setting `GITHUB_TOKEN` with permission to open pull requests lets Shelf Life open a PR with a source list. Without that token the report provides the new branch and compare link for opening a PR manually. If Git confirms the push and the PR request fails or times out, the report retains the branch and compare link. Check GitHub before retrying a request whose outcome could not be confirmed.
 
 The log records `shelflife.pr.opened` only when GitHub returned a pull request number. A branch without a pull request is registered as a patch. If the audited file differs from the base branch, nothing is pushed. `--open-pr` cannot be combined with `--synthetic`. A pull request is a proposal: the task stays in review until a person accepts it.
 

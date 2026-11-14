@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm, mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import { performance } from 'node:perf_hooks';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -40,9 +41,30 @@ async function withRepo(fn, markdown = syntheticFixture.markdown) {
 async function audit(root, publisher) {
   const writer = await createEventLog({ rootDir: join(root, 'rooms'), roomId: 'test_publish' });
   let report;
-  try { report = await runDirect({ ...syntheticFixture, writer, synthetic: true, publisher }); }
+  try { report = await runDirect({ ...syntheticFixture, writer, modelProvider: { ...syntheticFixture.modelProvider, model: 'mock-model' }, publisher }); }
   finally { await writer.close(); }
   return { report, logPath: writer.logPath, ...parseEventLog(await readFile(writer.logPath)) };
+}
+
+const githubOrigin = 'https://github.com/acme/handbook.git';
+const repo = 'acme/handbook';
+const publishRef = 'refs/heads/shelf-life/handbook-acme-example-estpublish';
+
+// Let Git use a real local receive-pack while the adapter exposes the effective
+// GitHub URL. Only the transport is substituted, including the hook's URL.
+function localGit(remote, intercept = () => undefined) {
+  return async (args, options) => {
+    const action = args.findIndex(arg => ['remote', 'ls-remote', 'fetch', 'show', 'read-tree', 'apply', 'diff', 'write-tree', 'commit-tree', 'rev-parse', 'push'].includes(arg));
+    const command = args[action];
+    const fixture = await intercept(command, args.slice(action + 1), options);
+    if (fixture !== undefined) return Buffer.from(fixture);
+    if (command === 'remote' || (command === 'ls-remote' && args.includes('--get-url'))) return Buffer.from(githubOrigin + '\n');
+    const localArgs = args.map(arg => arg === githubOrigin ? remote : arg);
+    return execFileSync('git', localArgs, {
+      cwd: options.cwd, input: options.input, timeout: options.timeoutMs,
+      env: { ...process.env, ...options.env, SHELFLIFE_PUSH_URL: remote }, stdio: ['pipe', 'pipe', 'pipe'],
+    });
+  };
 }
 
 function fakeGitHub(response) {
@@ -54,7 +76,7 @@ function fakeGitHub(response) {
 test('a validated patch becomes a pushed branch and a recorded pull request', async () => {
   await withRepo(async ({ root, remote, work, base }) => {
     const github = fakeGitHub(() => new Response(JSON.stringify({ number: 7, html_url: 'https://github.com/acme/handbook/pull/7' }), { status: 201 }));
-    const publisher = createGitPublisher({ repoDir: work, repo: 'acme/handbook', token: 'test-token', fetchImpl: github.fetchImpl, gitEnv: identity });
+    const publisher = createGitPublisher({ repoDir: work, repo, token: 'test-token', fetchImpl: github.fetchImpl, git: localGit(remote), gitEnv: identity });
     const { report, events, logPath } = await audit(root, publisher);
 
     assert.equal(report.status, 'completed');
@@ -91,7 +113,8 @@ test('a validated patch becomes a pushed branch and a recorded pull request', as
     assert.equal(artifact.payload.version, commit);
     assert.equal(artifact.payload.evidence[0].ref, events.find(e => e.type === 'shelflife.patch.proposed').eventId);
     assert.deepEqual(events.find(e => e.type === 'task.review').payload.artifactIds, ['pr_7']);
-    assert.match(events[0].payload.constraints[1], /pull request for a person to approve/);
+    assert.match(events[0].payload.constraints[1], /new branch and optional pull request for human review/);
+    assert.equal(events[0].payload.limits.maxMinutes, 7.5);
     assert.equal(events.filter(e => e.type === 'task.done').length, 0);
     assert.equal(events.at(-1).type, 'room.closed');
     assert.ok(!JSON.stringify(events).includes('test-token'));
@@ -102,7 +125,7 @@ test('a validated patch becomes a pushed branch and a recorded pull request', as
 test('without a token the branch is pushed and no pull request is claimed', async () => {
   await withRepo(async ({ root, remote, work }) => {
     const github = fakeGitHub(() => { throw new Error('must not be called'); });
-    const publisher = createGitPublisher({ repoDir: work, repo: 'acme/handbook', fetchImpl: github.fetchImpl, gitEnv: identity });
+    const publisher = createGitPublisher({ repoDir: work, repo, fetchImpl: github.fetchImpl, git: localGit(remote), gitEnv: identity });
     const { report, events, logPath } = await audit(root, publisher);
     assert.equal(github.calls.length, 0);
     assert.equal(report.publication.number, null);
@@ -119,7 +142,7 @@ test('without a token the branch is pushed and no pull request is claimed', asyn
 test('a rejected token leaves the pushed branch on record as a patch, not a pull request', async () => {
   await withRepo(async ({ root, remote, work }) => {
     const github = fakeGitHub(() => new Response('{"message":"Bad credentials"}', { status: 401 }));
-    const publisher = createGitPublisher({ repoDir: work, repo: 'acme/handbook', token: 'wrong', fetchImpl: github.fetchImpl, gitEnv: identity });
+    const publisher = createGitPublisher({ repoDir: work, repo, token: 'wrong', fetchImpl: github.fetchImpl, git: localGit(remote), gitEnv: identity });
     const { report, events } = await audit(root, publisher);
     assert.equal(report.status, 'completed');
     assert.equal(report.publication.number, null);
@@ -134,7 +157,7 @@ test('a rejected token leaves the pushed branch on record as a patch, not a pull
 
 test('nothing is published when the audited file differs from the base branch', async () => {
   await withRepo(async ({ root, remote, work, base }) => {
-    const publisher = createGitPublisher({ repoDir: work, repo: 'acme/handbook', token: 't', fetchImpl: fakeGitHub(() => { throw new Error('unused'); }).fetchImpl, gitEnv: identity });
+    const publisher = createGitPublisher({ repoDir: work, repo, token: 't', fetchImpl: fakeGitHub(() => { throw new Error('unused'); }).fetchImpl, git: localGit(remote), gitEnv: identity });
     const { report, events } = await audit(root, publisher);
     assert.equal(report.status, 'completed');
     assert.equal(report.publication, null);
@@ -163,6 +186,9 @@ test('pull request text escapes untrusted source names and repository names are 
   assert.equal(repoFromRemote('https://github.com/acme/handbook.git'), 'acme/handbook');
   assert.equal(repoFromRemote('git@github.com:acme/handbook.git'), 'acme/handbook');
   assert.equal(repoFromRemote('https://example.org/acme/handbook.git'), null);
+  assert.equal(repoFromRemote('https://notgithub.com/acme/handbook.git'), null);
+  assert.equal(repoFromRemote('https://github.com@other.example/acme/handbook.git'), null);
+  assert.equal(repoFromRemote('https://github.com/acme/handbook.git#fragment'), null);
   assert.equal(repoFromRemote('C:/tmp/remote.git'), null);
   assert.throws(() => createGitPublisher({ repoDir: '.', repo: 'not a repo' }), /owner\/name/);
 });
@@ -174,4 +200,126 @@ test('the command line refuses to publish a synthetic audit', async () => {
   try { assert.equal(await main(['--synthetic', '--open-pr'], {}), 2); }
   finally { console.error = original; }
   assert.match(errors.join('\n'), /Usage:/);
+});
+
+test('the runner and publisher reject synthetic publication before invoking Git', async () => {
+  const fail = () => assert.fail('Publication should never be invoked for synthetic input');
+  await assert.rejects(runDirect({ ...syntheticFixture, writer: { append: fail }, synthetic: true, publisher: fail }), /Synthetic audits/);
+  const publisher = createGitPublisher({ repoDir: '.', repo, git: fail });
+  await assert.rejects(publisher({ synthetic: true }), { code: 'publish_synthetic' });
+});
+
+test('mismatched or multiple effective remote URLs fail before any remote operation', async () => {
+  for (const [fetchUrl, pushUrl] of [
+    [githubOrigin, 'https://github.com/other/handbook'],
+    ['https://notgithub.com/acme/handbook.git', githubOrigin],
+    [githubOrigin, githubOrigin + '\n' + githubOrigin],
+    [githubOrigin + '\n' + githubOrigin, githubOrigin],
+  ]) {
+    const git = async args => {
+      assert.ok(args.includes('remote'), 'A network operation ran on an unbound remote');
+      return Buffer.from((args.includes('--push') ? pushUrl : fetchUrl) + '\n');
+    };
+    const publisher = createGitPublisher({ repoDir: '.', repo, git });
+    await assert.rejects(publisher({ doc: 'handbook/a.md', documentSha256: 'a'.repeat(64), diff: 'not reached', corrections: [{}] }), { code: 'publish_repo' });
+  }
+});
+
+test('the existing destination branch stays at its original commit', async () => {
+  await withRepo(async ({ root, remote, work, base }) => {
+    git(remote, 'update-ref', publishRef, base);
+    const publisher = createGitPublisher({ repoDir: work, repo, git: localGit(remote), gitEnv: identity });
+    const { report, events } = await audit(root, publisher);
+    assert.equal(report.publication, null);
+    assert.equal(events.findLast(e => e.type === 'run.failed').payload.error.code, 'publish_branch_exists');
+    assert.equal(git(remote, 'rev-parse', publishRef), base);
+  });
+});
+
+test('a branch created after discovery but before push advertisement is rejected by the hook', async () => {
+  await withRepo(async ({ root, remote, work, base }) => {
+    const adapter = localGit(remote, command => {
+      if (command === 'push') git(remote, 'update-ref', publishRef, base);
+    });
+    const publisher = createGitPublisher({ repoDir: work, repo, git: adapter, gitEnv: identity });
+    const { report, events } = await audit(root, publisher);
+    assert.equal(report.publication, null);
+    assert.equal(events.findLast(e => e.type === 'run.failed').payload.error.code, 'publish_push');
+    assert.equal(git(remote, 'rev-parse', publishRef), base);
+  });
+});
+
+test('an up-to-date branch created by a competing publisher is not claimed as this publication', async () => {
+  await withRepo(async ({ root, remote, work }) => {
+    let competingCommit;
+    const adapter = localGit(remote, (command, args) => {
+      if (command === 'push') {
+        competingCommit = args.at(-1).split(':', 1)[0];
+        git(work, 'push', '--quiet', '--no-verify', remote, competingCommit + ':' + publishRef);
+      }
+    });
+    const publisher = createGitPublisher({ repoDir: work, repo, git: adapter, gitEnv: identity });
+    const { report, events } = await audit(root, publisher);
+    assert.equal(report.publication, null);
+    assert.equal(events.findLast(e => e.type === 'run.failed').payload.error.code, 'publish_push');
+    assert.equal(git(remote, 'rev-parse', publishRef), competingCommit);
+  });
+});
+
+test('receive-pack refuses a competing branch creation after the push advertised zero', async () => {
+  await withRepo(async ({ root, remote, work, base }) => {
+    const hook = '#!/bin/sh\nset -eu\ngit -C "$RACE_REPOSITORY" update-ref "$RACE_REF" "$RACE_BASE"\n';
+    await writeFile(join(work, '.git', 'hooks', 'pre-push'), hook, { mode: 0o700 });
+    const gitEnv = { ...identity, RACE_REPOSITORY: remote, RACE_REF: publishRef, RACE_BASE: base };
+    const publisher = createGitPublisher({ repoDir: work, repo, git: localGit(remote), gitEnv });
+    const { report, events } = await audit(root, publisher);
+    assert.equal(report.publication, null);
+    assert.equal(events.findLast(e => e.type === 'run.failed').payload.error.code, 'publish_push');
+    assert.equal(git(remote, 'rev-parse', publishRef), base);
+  });
+});
+
+test('the publication deadline prevents later Git operations or a PR request', async t => {
+  t.mock.method(performance, 'now', () => fakeTime);
+  let fakeTime = 0;
+  const commands = [];
+  const publisher = createGitPublisher({ repoDir: '.', repo, token: 'fixture',
+    fetchImpl: () => assert.fail('A PR request ran after the deadline'),
+    git: async (args, { timeoutMs }) => {
+      commands.push(args[3]);
+      assert.equal(timeoutMs, 20);
+      fakeTime = 21;
+      return Buffer.from(githubOrigin + '\n');
+    },
+  });
+  try {
+    await assert.rejects(publisher({ doc: 'handbook/a.md', documentSha256: 'a'.repeat(64), diff: 'not reached', corrections: [{}], timeoutMs: 20 }), { code: 'publish_timeout' });
+    assert.deepEqual(commands, ['get-url']);
+  } finally { t.mock.restoreAll(); }
+});
+
+test('an exhausted budget after a confirmed push preserves the branch without claiming a PR', async t => {
+  await withRepo(async ({ root, remote, work }) => {
+    const fakeTime = { value: 0 };
+    const wallClock = performance.now.bind(performance);
+    const start = wallClock();
+    t.mock.method(performance, 'now', () => wallClock() - start + fakeTime.value);
+    const runGit = localGit(remote);
+    const publisher = createGitPublisher({ repoDir: work, repo, token: 'fixture', gitEnv: identity,
+      fetchImpl: () => assert.fail('Attempted to open a PR beyond the deadline'),
+      git: async (args, options) => {
+        const result = await runGit(args, options);
+        if (args.includes('push')) fakeTime.value += 91000;
+        return result;
+      },
+    });
+    try {
+      const { report, events } = await audit(root, publisher);
+      assert.equal(git(remote, 'rev-parse', publishRef), report.publication.commit);
+      assert.equal(report.publication.number, null);
+      assert.equal(events.findLast(e => e.type === 'run.failed').payload.error.code, 'publish_timeout');
+      assert.equal(events.find(e => e.type === 'artifact.registered').payload.kind, 'patch');
+      assert.ok(!events.some(e => e.type === 'shelflife.pr.opened'));
+    } finally { t.mock.restoreAll(); }
+  });
 });

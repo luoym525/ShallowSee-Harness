@@ -264,6 +264,23 @@ test('a reply cut off by the output cap is reported as incomplete, never parsed'
     error.code === 'anthropic_incomplete' && error.result.stopReason === 'max_tokens' && error.result.usage.outputTokens === 16000);
 });
 
+test('standalone requests use their provider deadline and honor a shorter remaining budget', async t => {
+  const timeouts = [];
+  const makeSignal = AbortSignal.timeout;
+  t.mock.method(AbortSignal, 'timeout', ms => {
+    timeouts.push(ms);
+    return makeSignal(ms);
+  });
+  const api = createAnthropicProvider({ apiKey: 'fixture-key', model: 'fixture-model', async fetchImpl() {
+    return Response.json({ model: 'fixture', stop_reason: 'end_turn', content: [{ type: 'text', text: '{"claims":[]}' }] });
+  } });
+  const linkup = createLinkupProvider({ apiKey: 'fixture-key', fetchImpl: async () => Response.json({ sources: [] }) });
+  await api.extract({ lines: [], maxClaims: 1 });
+  await api.extract({ lines: [], maxClaims: 1, timeoutMs: 2500 });
+  await linkup({ query: 'scope', depth: 'standard' });
+  assert.deepEqual(timeouts, [120000, 2500, 45000]);
+});
+
 test('the time budget grows with the number of claims and is recorded in the room limits', async () => {
   assert.deepEqual([1, 4, 12].map(timeBudgetSeconds), [135, 360, 960]);
   await withDir(async root => {
