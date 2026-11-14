@@ -1,5 +1,13 @@
 # Imperial AI Hack: Autonomous Agents Track (summary)
 
+> **Correction, Sat 14 Nov 14:10, from the Devpost rules page.** Lines below that say otherwise are out of date.
+>
+> - **Submission:** a demo video of up to 2 minutes and a public GitHub repository. The video and the last commit must both be before Sun 12:00.
+> - **Round one, 13:00–16:30:** a 10-minute slot. The judges watch the video, then ask questions for 6 minutes. No slides and no live demo. The top two per panel run their product live at about 15:50.
+> - **Scoring for this track (each marked 0 to 3, then weighted):** does it work 30, technical depth 25, usefulness 20, video and answers 15, originality 10.
+> - **Bounties:** up to 2 from your own track, judged on how central the partner's tool is to the product. Figma and Adaption are open to every track and do not count toward the 2.
+> - **Code:** work must start after 12:10 on Saturday.
+
 *Source: imperialaihack.com (event data in `data.js`), read Sat 14 Nov 2026. Check anything marked "unconfirmed" at the Help Desk (Huxley, floor 2).*
 
 ## The brief

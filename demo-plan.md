@@ -1,5 +1,14 @@
 # Shelf Life: 20-hour demo plan
 
+> **Updated Sat 14 Nov, 14:10.** This plan was written before the team merged it with the harness design and before the official judging rules were checked.
+>
+> - **Still valid:** the Shelf Life workflow, the planted-fact evaluation, the fallbacks and the Databricks notes.
+> - **No longer valid:** the Python-only build, the slides and the 3-minute live pitch.
+> - **Judging (Devpost rules page):** a demo video of up to 2 minutes, then 6 minutes of questions. No slides and no live demo in round one; the top two per panel run live at about 15:50. Scoring: does it work 30, technical depth 25, usefulness 20, video and answers 15, originality 10.
+> - **Bounties:** a team may enter 2 from its track (Linkup and Databricks), plus Figma, which does not count toward the 2.
+>
+> The merged plan is in [coordination-notes.md](coordination-notes.md) and the shared interface is [docs/CONTRACT.md](docs/CONTRACT.md).
+
 *Autonomous Agents track, Imperial AI Hack. Written Sat 14 Nov 2026, 13:00. "Shelf Life" is a working name. The idea is a recommendation, picked from the three sketches in [autonomous-agents-track.md](autonomous-agents-track.md).*
 
 ## Outline
