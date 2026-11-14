@@ -38,11 +38,11 @@
       "factId": "f04",
       "doc": "handbook/developer-tooling.md",
       "line": 11,
-      "quote": "GitHub Free includes 2,000 GitHub Actions minutes per month for private repositories.",
-      "statedValue": "2,000",
+      "quote": "GitHub blocks any file larger than 100 MiB.",
+      "statedValue": "100",
       "plantedStale": false,
       "primarySourceToCheck": "docs.github.com",
-      "authorNote": "Believed still correct. Check the GitHub billing documentation."
+      "authorNote": "Believed still correct. Check the GitHub documentation on large files."
     },
     {
       "factId": "f05",
