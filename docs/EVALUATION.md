@@ -21,6 +21,8 @@ node eval/prepare-review.mjs EVENTS.jsonl GOLD.json > REVIEW-DRAFT.json
 
 This copies the latest extraction/final IDs, canonical distinct final URLs and frozen gold digest. It never matches claims to gold, assigns source groups or claims a review occurred: `goldId`, reviewer names and groups stay `null`; all support/safety labels stay `unreviewed`. The scoring command deliberately rejects this untouched draft. A human must fill the mapping and genuine review fields. Keep the draft separate from agent inputs. Check `preparation.warnings` for partial log tails before reviewing. The command writes JSON to stdout and does not modify any input file; use a new output filename.
 
+For every row, a human must set the matching `goldId` or explicitly confirm it is an extra before leaving `goldId: null`; once a mapping reviewer is supplied, null means an adjudicated extra, not a pending match. Logs with no extracted claims fail preparation instead of producing a misleading empty review. Regenerate bindings after the log or gold changes, then review the affected rows again.
+
 Keep gold and review files outside the workflow agent's input. Freeze the actual handbook separately; `handbookRef` must identify its commit or content digest. The evaluator records SHA-256 hashes of all three input files for reproducibility. It does not independently validate that a handbook commit exists or that a reference is true.
 
 Gold JSON uses `schemaVersion: 1`, a unique `datasetVersion`, explicit `synthetic: true/false`, `handbookRef`, and `claims`. Each claim has:
