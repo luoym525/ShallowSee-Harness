@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmdirSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -28,7 +28,17 @@ function fixture(t, { maxRework = 1 } = {}) {
   let sequence = 0;
   const core = createCoordinator({ operatorId: 'lynx', operatorAuthority: authority, now: () => time });
   const workspace = mkdtempSync(join(tmpdir(), 'shallowsee-coordinator-'));
-  t.after(() => rmdirSync(workspace));
+  const subdirectories = [];
+  t.after(() => {
+    for (const directory of subdirectories.reverse()) rmdirSync(directory);
+    rmdirSync(workspace);
+  });
+  function folder(name) {
+    const directory = join(workspace, name);
+    mkdirSync(directory);
+    subdirectories.push(directory);
+    return directory;
+  }
   function input(overrides = {}) {
     return { projectId: 'example', commandId: 'command-' + ++sequence, ...overrides };
   }
@@ -84,7 +94,7 @@ function fixture(t, { maxRework = 1 } = {}) {
   }
   create();
   return {
-    core, authority, workspace, input, create, propose, confirm, task, claimInput, claim, forRun, end, build, document, check, accept,
+    core, authority, workspace, folder, input, create, propose, confirm, task, claimInput, claim, forRun, end, build, document, check, accept,
     advance(ms) { time += ms; },
     state() { return core.getProject('example'); },
   };
@@ -161,7 +171,8 @@ test('a paused or expired development run retains its directory until the runner
   f.create({ projectId: 'other' });
   f.confirm(f.propose({ projectId: 'other' }), { projectId: 'other' });
   const firstTask = f.task('development');
-  const otherTask = f.task('development', { projectId: 'other', workspace: f.workspace + '/.' });
+  const alias = process.platform === 'win32' ? f.workspace.toUpperCase() : f.workspace;
+  const otherTask = f.task('development', { projectId: 'other', workspace: alias + '/.' });
   const run = f.claim(firstTask);
   const other = () => f.claim(otherTask, { projectId: 'other' });
   assert.throws(other, { code: 'WORKSPACE_BUSY' });
@@ -174,6 +185,22 @@ test('a paused or expired development run retains its directory until the runner
   assert.throws(other, { code: 'WORKSPACE_BUSY' });
   f.end(run, 'cancelled');
   assert.equal(other().projectId, 'other');
+});
+
+test('canonical parent and child workspaces conflict in both directions, while siblings can run together', t => {
+  const f = fixture(t);
+  f.confirm(f.propose());
+  const parent = f.task('development');
+  const child = f.task('development', { workspace: f.folder('child') });
+  const sibling = f.task('development', { workspace: f.folder('child-other') });
+
+  const parentRun = f.claim(parent);
+  assert.throws(() => f.claim(child), { code: 'WORKSPACE_BUSY' });
+  f.end(parentRun);
+
+  const childRun = f.claim(child);
+  assert.throws(() => f.claim(f.task('development')), { code: 'WORKSPACE_BUSY' });
+  assert.notEqual(f.claim(sibling).workspace, childRun.workspace);
 });
 
 test('late callbacks are retained once and cannot advance a resumed project', t => {
@@ -277,6 +304,34 @@ test('a new candidate invalidates prior testing and preserves the earlier report
   const result = f.core.recordTestResult(f.forRun(late, { passed: false, reportRef: 'late-report' }));
   assert.deepEqual(result, { applied: false, reason: 'CANDIDATE_SUPERSEDED', runId: late.id });
   assert.equal(f.state().failedTests, 0);
+});
+
+test('a late development result preserves the newer candidate, guide and passing report', t => {
+  const f = fixture(t);
+  f.confirm(f.propose());
+  const oldTask = f.task('development');
+  const oldRun = f.claim(oldTask);
+  f.end(oldRun);
+  const current = f.build('b');
+  const guide = f.document('current');
+  const { test: report } = f.check(true, 'current-report');
+  const handoffs = f.state().handoffs;
+
+  const input = f.forRun(oldRun, { contentRef: commit('a') });
+  const result = { applied: false, reason: 'CANDIDATE_SUPERSEDED', runId: oldRun.id };
+  assert.deepEqual(f.core.submitCandidate(input), result);
+  assert.deepEqual(f.core.submitCandidate(input), result);
+  const state = f.state();
+  assert.deepEqual(state.candidate, { ...current, guide, test: report });
+  assert.deepEqual(state.handoffs, handoffs);
+  assert.deepEqual(state.history.filter(entry => entry.commandId === input.commandId).map(entry => entry.value.contentRef), [commit('a')]);
+
+  const nextRun = f.claim({ ...oldTask, version: oldRun.taskVersion });
+  assert.equal(nextRun.baseCandidateVersion, current.version);
+  f.end(nextRun);
+  const next = f.core.submitCandidate(f.forRun(nextRun, { contentRef: commit('c') })).candidate;
+  assert.equal(next.version, current.version + 1);
+  assert.equal(f.state().candidates[0].test.reportRef, report.reportRef);
 });
 
 test('failed independent tests permit bounded rework and replay cannot charge the budget twice', t => {

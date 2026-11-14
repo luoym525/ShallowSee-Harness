@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { realpathSync, statSync } from 'node:fs';
+import { isAbsolute, relative, sep } from 'node:path';
 
 const roles = {
   presales: 'presales',
@@ -85,6 +86,11 @@ function workspacePath(workspace) {
   }
 }
 
+function containsWorkspace(parent, child) {
+  const path = relative(parent, child);
+  return path === '' || (!isAbsolute(path) && path !== '..' && !path.startsWith('..' + sep));
+}
+
 function planBody(plan = {}) {
   const acceptanceCriteria = strings(plan.acceptanceCriteria, 'acceptanceCriteria');
   requireThat(acceptanceCriteria.length, 'INVALID_PLAN', 'A plan needs at least one acceptance criterion.');
@@ -138,6 +144,14 @@ function disposition(project, kind, task) {
 function matchesRun(project, task, run, at) {
   return !project.paused && run.executionVersion === project.executionVersion &&
     task.runId === run.id && task.version === run.taskVersion && at < run.leaseUntil;
+}
+
+function runDisposition(project, task, run, at) {
+  if (!matchesRun(project, task, run, at)) return 'STALE_RUN';
+  if (task.kind === 'development' && run.baseCandidateVersion !== (project.candidate?.version ?? null)) {
+    return 'CANDIDATE_SUPERSEDED';
+  }
+  return disposition(project, task.kind, task);
 }
 
 function handoff(project, input, from, to, artifacts) {
@@ -200,7 +214,8 @@ export function createCoordinator({ operatorId, operatorAuthority, now = Date.no
   function hasWriter(key) {
     for (const project of projects.values()) {
       for (const run of project.runs.values()) {
-        if (run.workspaceKey === key && !run.end) return true;
+        if (run.workspaceKey && !run.end &&
+            (containsWorkspace(key, run.workspaceKey) || containsWorkspace(run.workspaceKey, key))) return true;
       }
     }
     return false;
@@ -211,7 +226,7 @@ export function createCoordinator({ operatorId, operatorAuthority, now = Date.no
       const { project, task, run } = runContext(inputs);
       requireThat(kinds.includes(task.kind), 'WRONG_TASK_KIND', 'Run cannot submit this kind of outcome.');
       const at = clock();
-      const reason = matchesRun(project, task, run, at) ? disposition(project, task.kind, task) : 'STALE_RUN';
+      const reason = runDisposition(project, task, run, at);
       if (reason) {
         const result = { applied: false, reason, runId: run.id };
         project.history.push({ ...result, commandId: inputs.commandId, action, value, at });
@@ -320,7 +335,7 @@ export function createCoordinator({ operatorId, operatorAuthority, now = Date.no
         requireThat(agent.id === input.agentId, 'AGENT_ROLE_MISMATCH', 'Only the assigned role profile can claim this task.');
         requireThat(task.status !== 'done', 'TASK_SETTLED', 'Task already has a recorded outcome.');
         const previous = project.runs.get(task.runId);
-        requireThat(!previous || !matchesRun(project, task, previous, at) || previous.end?.outcome === 'failed' || previous.end?.outcome === 'cancelled',
+        requireThat(!previous || runDisposition(project, task, previous, at) || previous.end?.outcome === 'failed' || previous.end?.outcome === 'cancelled',
           'TASK_ALREADY_CLAIMED', 'A current claim still owns the task.');
         requireThat(task.dependencies.every(id => taskOf(project, id).status === 'done'), 'DEPENDENCIES_PENDING', 'Complete all dependency tasks before claiming this task.');
         requireThat(!task.workspace || !hasWriter(task.workspace.key), 'WORKSPACE_BUSY', 'An earlier writer has yet to confirm it stopped.');
@@ -328,6 +343,7 @@ export function createCoordinator({ operatorId, operatorAuthority, now = Date.no
         const run = {
           id: input.commandId, projectId: project.id, taskId: task.id, agentId: agent.id,
           taskVersion: task.version + 1, executionVersion: project.executionVersion, leaseUntil: at + leaseMs,
+          baseCandidateVersion: task.kind === 'development' ? project.candidate?.version ?? null : null,
           planVersion: task.planVersion, candidateVersion: task.candidateVersion,
           candidateContentRef: task.candidateVersion ? project.candidate.contentRef : null,
           guideVersion: task.guideVersion, deliveryId: task.deliveryId,
@@ -344,9 +360,8 @@ export function createCoordinator({ operatorId, operatorAuthority, now = Date.no
       const role = task.role;
       const tool = text(input.tool, 'tool');
       requireThat(toolKinds.has(tool), 'TOOL_DENIED', 'Tool capability is unknown.');
-      requireThat(matchesRun(project, task, run, clock()) && !run.end && task.status === 'claimed',
-        'STALE_RUN', 'Only the active execution may use tools.');
-      const reason = disposition(project, task.kind, task);
+      requireThat(!run.end && task.status === 'claimed', 'STALE_RUN', 'Only the active execution may use tools.');
+      const reason = runDisposition(project, task, run, clock());
       requireThat(!reason, reason, 'The task is unavailable in the current project state.');
       requireThat(tool !== 'search' || searchRoles.has(role), 'SEARCH_DENIED', 'This role cannot use search.');
       requireThat(tool !== 'write_files' || (role === 'developer' && run.workspace),
@@ -441,7 +456,7 @@ export function createCoordinator({ operatorId, operatorAuthority, now = Date.no
         requireThat(['completed', 'failed', 'cancelled'].includes(input.outcome), 'INVALID_INPUT', 'Invalid run outcome.');
         const at = clock();
         run.end = { outcome: input.outcome, at };
-        const current = matchesRun(project, task, run, at);
+        const current = !runDisposition(project, task, run, at);
         project.history.push({ action: 'recordRunEnd', commandId: input.commandId, runId: run.id, current, ...run.end });
         return { runId: run.id, current, end: run.end };
       });
