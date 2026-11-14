@@ -1,6 +1,6 @@
 # Demonstration and acceptance checklist (draft)
 
-The team has proposed both a multi-model collaboration harness and a Shelf Life workflow. Product scope, demo scenario, owners and the event contract remain to be agreed by the human team. This checklist identifies evidence common to either direction; it is not a claim that any capability exists.
+The latest user-defined product is the [wish-driven software-production Harness](docs/WISH-CODING.md), with distinct presales, planning, project-manager, development, testing and after-sales roles. Its role permissions, proposal-confirmation gate and versioned delivery criteria take precedence over the earlier scope decisions below. Demo details, owners and runtime extensions still need to be implemented or agreed. This checklist identifies evidence requirements; it is not a claim that any capability exists.
 
 ## Demonstration
 
@@ -33,7 +33,7 @@ Record actual pass/fail/blocked, date, environment, exact reproduction steps and
 
 ## Open decisions
 
-- Confirm product scope and one demonstration scenario with the human team.
+- Select one demonstration scenario for the now-defined wish-driven product scope with the human team.
 - Agree owners, shared event contract and which repository/version each owner uses.
 - Verify real provider capabilities, credentials and access privately; never place secrets in the shared log.
 - Agree the benchmark, test environment and time available before quoting metrics.

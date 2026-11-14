@@ -1,5 +1,7 @@
 # Shelf Life: 20-hour demo plan
 
+> Historical Shelf Life proposal. The current user-defined product is the [wish-driven software-production Harness](docs/WISH-CODING.md). This plan no longer defines product scope, role permissions or completion criteria.
+
 > **Updated Sat 14 Nov, 14:10.** This plan was written before the team merged it with the harness design and before the official judging rules were checked.
 >
 > - **Still valid:** the Shelf Life workflow, the planted-fact evaluation, the fallbacks and the Databricks notes.
