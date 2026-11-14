@@ -6,6 +6,7 @@ Status: awaiting human review; not scoring gold. This draft follows Fable's requ
 - All24 IDs, paths, line numbers and exact quotes were checked against that commit. Git blob IDs bind the four documents, author intent and worksheet.
 - `label`, `expectedValue`, `scope`, `asOfUtc`, `verifiedBy`, `verifiedAtUtc` and `confidence` are deliberately null. `referenceUrls` is empty. The existing gold validator rejects this unchanged draft.
 - The14 planted/10 other split is author intent only. Worksheet value/label strings are copied under `machineObservation`, with its original source URL and reported lookup window. They are not independently verified findings, labels or current values.
+- The worksheet's reported17:25–17:40 UTC lookup window is unverified. Source commit97010d0 records17:30:52 UTC, before that window ends; no fetch logs establish the actual retrieval times. Do not copy this author record into verification timestamps.
 - `additionalSourceCandidates` records three automated lookups with limitations. They are not human review or a second independent source group. IETF/RFC pages and Oracle are offered for f11/f20/f23; Wikipedia observations are retained as provenance rather than silently replaced.
 
 ## Human handoff

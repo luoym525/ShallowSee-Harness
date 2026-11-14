@@ -21,6 +21,9 @@
       "path": "eval/drafts/handbook-reference-worksheet.md",
       "gitBlobSha": "6272a11ecf078e78a6c3fb42e952e5e2478df0f9",
       "reportedBy": "Fable automated page fetches and summarising model",
+      "reportedLookupWindowVerified": false,
+      "sourceCommitterTimeUtc": "2026-11-14T17:30:52Z",
+      "timingNote": "The reported window ends after the source commit's recorded time. No fetch logs establish actual retrieval times; retain this only as an unverified author record.",
       "reportedLookupWindowUtc": {
         "start": "2026-11-14T17:25:00Z",
         "end": "2026-11-14T17:40:00Z"
