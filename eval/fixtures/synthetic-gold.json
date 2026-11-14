@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "datasetVersion": "synthetic-acme-v1",
+  "handbookRef": "samples/generate-sample.mjs (fictional Acme; not a real handbook)",
+  "synthetic": true,
+  "claims": [
+    {
+      "id": "gold-limit", "label": "stale", "doc": "handbook/pricing.md",
+      "quote": "The free tier includes 500 build minutes per month.",
+      "asOfUtc": "2026-11-14T16:00:00.000Z", "verifiedBy": "synthetic-fixture-author",
+      "verifiedAtUtc": "2026-11-14T16:00:00.000Z", "referenceUrls": []
+    },
+    {
+      "id": "gold-support", "label": "fresh", "doc": "handbook/pricing.md",
+      "quote": "Support replies within 2 business days.",
+      "asOfUtc": "2026-11-14T16:00:00.000Z", "verifiedBy": "synthetic-fixture-author",
+      "verifiedAtUtc": "2026-11-14T16:00:00.000Z", "referenceUrls": []
+    },
+    {
+      "id": "gold-price", "label": "unverifiable", "doc": "handbook/pricing.md",
+      "quote": "The Team plan costs $20 per seat.",
+      "asOfUtc": "2026-11-14T16:00:00.000Z", "verifiedBy": "synthetic-fixture-author",
+      "verifiedAtUtc": "2026-11-14T16:00:00.000Z", "referenceUrls": []
+    }
+  ]
+}
