@@ -56,7 +56,7 @@ export function messageAuthor(event, members = new Map()) {
 export function buildAudit(events = []) {
   const room = { goal: '', status: 'waiting', driver: null, synthetic: false, acceptanceCriteria: [] };
   const members = new Map(), tasks = new Map(), runs = new Map(), claims = new Map();
-  const entries = [], patches = [], prs = new Map(), reviews = [], warnings = [];
+  const entries = [], patches = [], artifacts = [], prs = new Map(), reviews = [], warnings = [];
   const ids = new Set(), sequences = new Set();
   const ordered = array(events).filter(e => e && Number.isInteger(e.seq) && e.seq > 0 && typeof e.type === 'string').slice().sort((a, b) => a.seq - b.seq);
   let eventCount = 0, lastSeq = 0;
@@ -136,13 +136,14 @@ export function buildAudit(events = []) {
     }
     const claimId = typeof p.claimId === 'string' && p.claimId ? p.claimId : null;
     if (e.type === 'shelflife.claim.extracted' && claimId) Object.assign(claimFor(claimId), { claimId, doc: text(p.doc), lineStart: measured(p.lineStart),
-      lineEnd: measured(p.lineEnd), quote: text(p.quote), statement: text(p.statement), category: text(p.category) });
+      lineEnd: measured(p.lineEnd), quote: text(p.quote), statement: text(p.statement), category: text(p.category), oldValue: nullableText(p.oldValue) });
     if (e.type === 'shelflife.search.completed' && claimId) claimFor(claimId).searches.push({ claimId, attempt: measured(p.attempt), query: text(p.query),
       provider: text(p.provider), depth: text(p.depth), answer: nullableText(p.answer), sources: sources(p.sources), durationMs: measured(p.durationMs) });
     if (e.type === 'shelflife.check.result' && claimId) claimFor(claimId).checks.push({ claimId, attempt: measured(p.attempt), check: text(p.check),
       passed: flag(p.passed), detail: text(p.detail), eventId: text(e.eventId) });
     if (e.type === 'shelflife.verdict.proposed' && claimId) claimFor(claimId).proposed = verdict(p);
     if (e.type === 'shelflife.verdict.final' && claimId) claimFor(claimId).final = verdict(p);
+    if (e.type === 'artifact.registered') artifacts.push({ artifactId: text(p.artifactId), kind: text(p.kind), location: text(p.location), version: nullableText(p.version) });
     if (e.type === 'shelflife.patch.proposed') patches.push({ doc: text(p.doc), claimIds: strings(p.claimIds), diff: text(p.diff), eventId: text(e.eventId) });
     if (e.type === 'shelflife.pr.opened' || e.type === 'shelflife.pr.updated') {
       const key = text(p.repo) + '#' + String(measured(p.number));
@@ -170,7 +171,7 @@ export function buildAudit(events = []) {
     counts[Object.hasOwn(counts, conclusion) ? conclusion : 'pending']++;
   }
   const checks = claimList.flatMap(c => c.checks);
-  return { room, members, tasks: taskList, runs: runList, claims: claimList, entries, patches, prs: [...prs.values()], reviews, warnings,
+  return { room, members, tasks: taskList, runs: runList, claims: claimList, entries, patches, artifacts, prs: [...prs.values()], reviews, warnings,
     metrics: { eventCount, lastSeq, counts, claimCount: claimList.length, completedRuns: completed.length, acceptedTasks: taskList.filter(t => t.accepted).length,
       totalTasks: taskList.length, failedChecks: checks.filter(c => c.passed === false).length, passedChecks: checks.filter(c => c.passed === true).length,
       retries: claimList.reduce((sum, c) => sum + new Set(c.searches.filter(s => s.attempt > 1).map(s => s.attempt)).size, 0),
