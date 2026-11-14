@@ -7,9 +7,10 @@ import { parseArgs } from 'node:util';
 import { createEventLog } from '../event-log/index.mjs';
 import { documentLines } from './checks.mjs';
 import { createAnthropicProvider, createLinkupProvider } from './providers.mjs';
+import { createGitPublisher } from './publish.mjs';
 import { runDirect } from './runner.mjs';
 
-const usage = 'Usage: node packages/shelf-life/cli.mjs [--rooms-dir data/rooms] [--room-id NEW_ID] [--max-claims 4] [--doc-label handbook/page.md] <public-markdown-file>\n       node packages/shelf-life/cli.mjs [--rooms-dir data/rooms] --synthetic\nLive mode needs ANTHROPIC_API_KEY, SHELFLIFE_ANTHROPIC_MODEL and LINKUP_API_KEY.';
+const usage = 'Usage: node packages/shelf-life/cli.mjs [--rooms-dir data/rooms] [--room-id NEW_ID] [--max-claims 4] [--doc-label handbook/page.md] [--open-pr [--repo-dir .]] <public-markdown-file>\n       node packages/shelf-life/cli.mjs [--rooms-dir data/rooms] --synthetic\nLive mode needs ANTHROPIC_API_KEY, SHELFLIFE_ANTHROPIC_MODEL and LINKUP_API_KEY.\n--open-pr pushes a new branch with the validated patch and, when GITHUB_TOKEN is set, opens a pull request. It never merges.';
 
 async function readMarkdown(path) {
   const file = await open(resolve(path), constants.O_RDONLY | constants.O_NONBLOCK);
@@ -64,10 +65,13 @@ export async function main(args, env = process.env) {
   const { values, positionals } = parseArgs({ args, allowPositionals: true, options: {
     help: { type: 'boolean', short: 'h' }, synthetic: { type: 'boolean' },
     'rooms-dir': { type: 'string' }, 'room-id': { type: 'string' }, 'max-claims': { type: 'string' }, 'doc-label': { type: 'string' },
+    'open-pr': { type: 'boolean' }, 'repo-dir': { type: 'string' },
   } });
   if (values.help) { console.log(usage); return 0; }
   const synthetic = values.synthetic === true;
-  if (synthetic ? positionals.length !== 0 || values['doc-label'] || values['max-claims'] : positionals.length !== 1) {
+  const openPr = values['open-pr'] === true;
+  if (synthetic ? positionals.length !== 0 || values['doc-label'] || values['max-claims'] || openPr || values['repo-dir']
+    : positionals.length !== 1 || (values['repo-dir'] && !openPr)) {
     console.error(usage);
     return 2;
   }
@@ -77,7 +81,9 @@ export async function main(args, env = process.env) {
     const doc = values['doc-label'] ?? basename(file);
     const modelProvider = createAnthropicProvider({ apiKey: env.ANTHROPIC_API_KEY, model: env.SHELFLIFE_ANTHROPIC_MODEL });
     const searchProvider = createLinkupProvider({ apiKey: env.LINKUP_API_KEY });
-    config = { doc, markdown: await readMarkdown(file), modelProvider, searchProvider };
+    const publisher = openPr ? createGitPublisher({ repoDir: resolve(values['repo-dir'] ?? '.'),
+      repo: env.SHELFLIFE_HANDBOOK_REPO || null, token: env.GITHUB_TOKEN || null }) : null;
+    config = { doc, markdown: await readMarkdown(file), modelProvider, searchProvider, publisher };
   }
   documentLines(config.doc, config.markdown);
   const maxClaims = Number(values['max-claims'] ?? '4');

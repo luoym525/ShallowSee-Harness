@@ -83,6 +83,8 @@ async function post(fetchImpl, url, headers, body, label, timeoutMs = REQUEST_TI
   }
 }
 
+export { post as postJson };
+
 export function createAnthropicProvider({ apiKey, model, fetchImpl = fetch }) {
   if (!nonempty(apiKey) || !nonempty(model)) throw new Error('Set ANTHROPIC_API_KEY and SHELFLIFE_ANTHROPIC_MODEL.');
   async function request(system, data, schema, maxTokens, timeoutMs) {
