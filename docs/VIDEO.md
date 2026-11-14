@@ -4,7 +4,7 @@
 
 ## Why the video carries most of the score
 
-In round one the judges only see this video and then ask questions for 6 minutes. There are no slides and no live demo. So the video is the evidence for four of the five criteria:
+In round one the judges only see this video and then ask questions for 6 minutes. There are no slides and no live demo. The table below is the team's planning summary of the judging criteria; confirm the current organizer rules and deadline before submission:
 
 | Criterion | Weight | What in the video earns it |
 |---|---|---|
@@ -18,17 +18,17 @@ The video must be uploaded, and the last commit made, before **Sun 15 Nov 12:00*
 
 ## Script
 
-About 225 spoken words, which leaves room to breathe inside 2:00.
+Target duration: 2:00. Time the final spoken text and actual footage; shorten it as needed.
 
 | Time | On screen | Voice |
 |---|---|---|
 | 0:00–0:12 | A handbook page. One line is highlighted: "The latest stable release of Python is Python 3.11." | "Every team's documentation goes stale quietly. Now assistants read those documents and repeat the stale facts with confidence." |
-| 0:12–0:24 | Title: Shelf Life. A strip of six steps: read, extract, search, verdict, check, patch. | "Shelf Life is an agent that audits a document against the live web, finds what has gone out of date, and proposes a fix you can trust, because every fix carries its sources." |
+| 0:12–0:24 | Title: Shelf Life. A strip of six steps: read, extract, search, verdict, check, patch. | "Shelf Life is an agent that audits a document against the live web, finds what has gone out of date, and proposes a cited fix for a person to review." |
 | 0:24–0:50 | The real command in a terminal, then the workbench timeline filling up. Caption on screen: "Real run at ⟨N⟩× speed. Actual time ⟨m:ss⟩." | "This is a real run. It pulls out each checkable claim, searches twice with Linkup, and asks Claude for a verdict using only those sources." |
-| 0:50–1:12 | The findings page: an old value and its replacement, two sources from different sites, four passed checks. Then one claim marked "unsure". | "A correction is accepted only when code, not the model, confirms it: the quote really is in the document, two separate sites support the new value, and the edit changes one value on one line. When the evidence is weak, it says 'unsure' and leaves the line alone." |
-| 1:12–1:25 | The pull request on GitHub: one-line changes, and a description listing the sources. | "Accepted fixes become a pull request, with the sources written into the description for a person to approve." |
+| 0:50–1:12 | The findings page: an old value and its replacement, two sources from different sites, four passed checks. Then one claim marked "unsure". | "Code checks whether the quote is in the document, two different sites have snippets containing the new value, and the edit changes one value on one line. A person still checks the meaning and source independence. When the evidence is weak, it says 'unsure' and leaves the line alone." |
+| 1:12–1:25 | The pull request on GitHub: one-line changes, and a description listing the sources. | "Proposed corrections can become a pull request, with their sources listed for a person to check and approve." |
 | 1:25–1:45 | The evaluation table. Caption: "24 facts, 14 deliberately aged. Answer key checked by hand." | "We tested it on a handbook where we deliberately aged fourteen facts. It caught ⟨X⟩, raised ⟨Y⟩ false alarms and left ⟨Z⟩ for a person. A human-checked answer key decides those numbers, not the agent." |
-| 1:45–1:57 | One diagram: a single event log feeding the live view, the replay, the evaluation and the dashboard. | "Everything the agent does is one append-only event log. The live view, the replay, the evaluation and the dashboard all read that same log." |
+| 1:45–1:57 | One diagram: a single event log feeding the live view, replay and evaluation. Add a dashboard only after its integration has been implemented and demonstrated. | "Everything the agent does is one append-only event log. The live view, the replay and the evaluation read that same log." |
 | 1:57–2:00 | Closing card: Shelf Life, team ShallowSee, the repository address. | "Shelf Life. Keep your docs true." |
 
 ## Rules for recording
@@ -39,6 +39,8 @@ About 225 spoken words, which leaves room to breathe inside 2:00.
 4. **Show one honest miss.** Keep the "unsure" claim in. It is the most persuasive ten seconds in the video.
 5. **No keys on screen.** Record the terminal after the keys are loaded, and never open `.env`.
 6. **Record twice.** Take the first full recording on Saturday night as soon as a real run and a pull request exist. Re-record on Sunday morning only if something improved.
+
+7. **Get version-specific owner approval before uploading or publishing.** This document authorizes no recording, upload or publication. The owner's review workflow and any active platform pause remain in force.
 
 ## What must exist before recording
 
