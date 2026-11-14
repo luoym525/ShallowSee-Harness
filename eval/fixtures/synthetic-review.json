@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "roomId": "room_sample_shelflife",
+  "datasetVersion": "synthetic-acme-v1",
+  "goldDigest": "ba83f297cbf156abdc44c826dbdfc58a03b1751210e768848bd83814c897694e",
+  "findings": [
+    {
+      "claimId": "c1", "goldId": "gold-limit", "extractedEventId": "evt_0017", "finalEventId": "evt_0033",
+      "citationSupport": "yes", "independentSources": "yes", "correctionSafety": "safe",
+      "reviewedBy": "synthetic-fixture-author (not real evidence review)",
+      "sourceReviews": [
+        { "url": "https://docs.acme.example/pricing", "source_group_id": "acme", "supportsVerdict": "yes", "supportsReplacement": "yes", "reviewedBy": "synthetic-fixture-author" },
+        { "url": "https://news.devtools.example/acme-free-tier", "source_group_id": "devtools-weekly", "supportsVerdict": "yes", "supportsReplacement": "yes", "reviewedBy": "synthetic-fixture-author" }
+      ]
+    },
+    {
+      "claimId": "c2", "goldId": "gold-support", "extractedEventId": "evt_0018", "finalEventId": "evt_0038",
+      "citationSupport": "yes", "independentSources": "unreviewed", "correctionSafety": "not_applicable",
+      "reviewedBy": "synthetic-fixture-author (not real evidence review)",
+      "sourceReviews": [
+        { "url": "https://docs.acme.example/support", "source_group_id": "acme", "supportsVerdict": "yes", "supportsReplacement": "unreviewed", "reviewedBy": "synthetic-fixture-author" },
+        { "url": "https://help.acme-status.example/sla", "source_group_id": "acme", "supportsVerdict": "yes", "supportsReplacement": "unreviewed", "reviewedBy": "synthetic-fixture-author" }
+      ]
+    },
+    {
+      "claimId": "c3", "goldId": "gold-price", "extractedEventId": "evt_0019", "finalEventId": "evt_0046",
+      "citationSupport": "unclear", "independentSources": "unreviewed", "correctionSafety": "not_applicable",
+      "reviewedBy": "synthetic-fixture-author (not real evidence review)",
+      "sourceReviews": [
+        { "url": "https://docs.acme.example/pricing", "source_group_id": "acme", "supportsVerdict": "unclear", "supportsReplacement": "unreviewed", "reviewedBy": "synthetic-fixture-author" },
+        { "url": "https://prices.saas-tracker.example/acme", "source_group_id": "saas-tracker", "supportsVerdict": "unclear", "supportsReplacement": "unreviewed", "reviewedBy": "synthetic-fixture-author" }
+      ]
+    }
+  ]
+}
