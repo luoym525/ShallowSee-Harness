@@ -1,5 +1,7 @@
 # ShallowSee event contract
 
+> Product scope update: [wish-driven software production](WISH-CODING.md) is the current target. This document describes the existing v1 envelope and the earlier Shelf Life workflow. General project stages, confirmed plan versions and role handoffs still need implementation; the runtime contract has not been changed by the product-definition update.
+
 **Status: v1 draft for review.** Freeze target: Sat 14 Nov, 14:45. After the freeze, only optional fields may be added. Any other change is announced in the team room first and bumps `schemaVersion`.
 
 This is the one interface every part of the project shares. The runtime writes events; the workbench (live and replay), the room MCP server, the Shelf Life workflow, the evaluation scripts and the Databricks loader all read the same log.

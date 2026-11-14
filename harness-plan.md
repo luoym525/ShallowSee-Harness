@@ -1,5 +1,7 @@
 # Multi-agent harness plan (with Shelf Life and Linkup)
 
+> Superseded product scope: the latest user-defined target is [wish-driven software production](docs/WISH-CODING.md). The six business roles, intent-based handoffs, role-specific model policy and restricted search access in that definition take precedence over this earlier registry and Shelf Life demonstration proposal. Model names and items marked agreed below are historical discussion records, not current verified configuration.
+
 *Imperial AI Hack, Autonomous Agents track. Written Sat 14 Nov 2026, 13:30, from the Claude / GPT 6.1 / Bill discussion. This adds to [demo-plan.md](demo-plan.md); it does not replace it. Every gate, deadline, fallback and pitch beat in that plan still stands.*
 
 Items marked **(agreed)** were settled in the discussion. Items marked **(proposed)** are Claude's suggestions to fill gaps nobody decided; change them freely.
