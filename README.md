@@ -94,7 +94,7 @@ node --test "apps/**/*.test.mjs" "eval/**/*.test.mjs" "packages/**/*.test.mjs" "
 - One successful real run so far. The 6-wish benchmark has not yet been run on live models, so we don't quote a success rate.
 - Visual checks need a headless browser and a vision model; without them they are skipped, and the run is reported as partial.
 - Only Anthropic and Linkup have been used live. The other provider presets are implemented and unit-tested.
-- Handling for when the user's API quota is exhausted (route around the provider, or pause with a resume time) is in review, and the console doesn't show a quota banner yet.
+- When the user's API quota runs out, the harness now routes around that provider or pauses the run with a resume time (merged in PRs #24 and #25, offline-tested only). The console doesn't show a quota banner yet.
 
 ## Read more
 
