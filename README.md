@@ -1,107 +1,107 @@
 # ShallowSee Autopilot
 
-**Type a wish. Get a tested product.** A person with no technical background describes what they want. The harness then researches with live web search (Linkup), writes a plan, checks the plan's facts against current sources (built-in Shelf Life skill), has an independent model approve it, builds one piece at a time in a sandbox, tests every piece with an independent tester, reflects, switches to a stronger model when a piece keeps failing, and hands over the product with an honest report. It asks the user nothing during the run.
+**Say what you want in one sentence. Get back working software, test evidence, and an honest report. Nobody needs to write, review or test code.**
 
-The harness picks a model for every step: the strongest model plans, an independent model reviews and tests, and cheaper models write the code unless the planner or a failed test says otherwise. Every choice is logged with a one-line reason.
+> First real run, 15 Nov 2026: a one-sentence wish became a working bill-splitter web page in **9 minutes for $2.17**. It used **4 live Linkup searches**, had its plan **fact-checked against current sources before any code was written**, and passed **10 of 11 independent acceptance checks**. One coding step escalated automatically from a cheaper model to Claude Opus 5.5 after failing twice.
 
-## Quick start
+## The problem
 
-1. Node.js 20 or later. No `npm install`; there are no dependencies.
-2. `cp apiConfig.example.json apiConfig.json`, then paste your Anthropic and Linkup keys (git ignores the file), or add providers on the console's Setup page.
-3. Check the setup and see which model each role gets: `node harness/bin/shallowsee.mjs config check`
-4. Run a wish from the command line: `node harness/bin/shallowsee.mjs run "I want a page that splits a restaurant bill between friends" --budget-usd 3`
-5. Or use the web console: `node harness/console/server/index.mjs`, then open http://127.0.0.1:4320. Finished web products open on a separate preview origin, http://127.0.0.1:4321.
+AI coding tools still need a developer in the loop. Someone has to answer their questions, check that the facts they rely on are current, decide whether the result is good, and test it. People with ideas but no technical background are locked out. And "the model says it works" is not evidence.
 
-## First real run (15 Nov 2026, real Anthropic and Linkup keys)
+## What we built
 
-Run `hr-20261115-104503-z4sl`, wish: *"a simple web page where I type in my restaurant bill and how many friends are sharing it, and it tells each person how much to pay, including the usual UK service charge."*
+ShallowSee Autopilot is an autonomous harness that runs the whole software process by itself:
+
+- **It never asks the user anything during a run.** Every ambiguity becomes a written, reviewable assumption.
+- **It researches with live web search** (Linkup) instead of trusting a model's memory.
+- **It verifies its own plan's facts** against current sources before building, using the built-in Shelf Life skill.
+- **It never grades its own work.** An independent tester runs real acceptance checks, and an independent model reviews the plan and the result.
+- **It picks the right model for each step.** The strongest model plans, cheaper models write code, a different model tests, and it escalates after failures.
+- **It is honest.** A skipped check means "partial", never "delivered", and every number in the report traces back to an event log.
+
+## How it works
+
+```
+wish → intake → research (Linkup) → plan → plan check (Shelf Life + Linkup) → independent plan review
+     → for each work item: build (sandboxed) → independent test → reflect → retry / escalate model / next
+     → final test → final review → fact check (Shelf Life + Linkup) → report + product
+```
+
+- **Model routing:** the planner suggests a coder model for each work item, and the router checks it against the models you configured, their capabilities and your budget. A failed attempt escalates one tier, and every choice is logged with a one-line reason.
+- **Keep-best:** if a new attempt scores lower, the workspace resets to the best commit.
+- **Sandbox:** model-written code runs under Node's permission model. It can only touch its own workspace, can't start other processes, and has no API keys in its environment. Acceptance tests run from a read-only frozen copy, so the code under test can't edit them.
+- **Hard limits:** a budget in USD, a time limit and a cap on build iterations. Plans that aren't approved stop the run instead of sneaking through.
+- **Live console:** an English web UI shows each step, which model is working and why, sources, test evidence and cost. Setup works like CC Switch: pick a provider preset, paste a key, test it.
+
+## How we use Linkup
+
+Linkup is the harness's only source of fresh facts, and it is used at three points in every run:
+
+1. **Research:** before planning, the researcher sends targeted Linkup searches (sourced answers) for the current APIs, standards and facts the product needs. Every finding carries its source URLs, which are passed to the planner and shown in the console.
+2. **Plan check, before any code is written:** the built-in **Shelf Life** skill extracts every checkable fact the plan relies on and verifies each one with two independent Linkup searches. A fact that two independent sources show to be stale **automatically forces the plan to be revised** with the corrected value and its sources.
+3. **Fact check of the delivered README:** the same skill audits the product's documentation and lists any stale claims as proposed, cited corrections.
+
+Shelf Life started as our stand-alone tool for auditing documentation and was turned into a built-in harness skill. Its full audit trail (claims, searches, verdicts and checks) is kept in its own event log for each run.
+
+## APIs, models and datasets
+
+| Kind | What | Used for |
+|---|---|---|
+| API | **Linkup Search API** (`/v1/search`, sourced answers) | Research, plan fact check, README fact check |
+| API | **Anthropic Messages API** (structured outputs, tool use) | All model calls in the real run |
+| API | OpenAI-compatible Chat Completions (presets for OpenAI, DeepSeek, Gemini, OpenRouter, Ollama, custom) | Supported and unit-tested; not yet exercised live |
+| Model | **Claude Opus 5.5** | Planner; escalation target after repeated failures |
+| Model | **Claude Sonnet 5.5** | Intake, research, plan review (independent of the planner), tester, reflector, reporter, coder for harder items |
+| Model | **Claude Haiku 5.5** | Default coder for easy work items |
+| Dataset | `harness/eval/wishes.json`: 6 hand-written benchmark wishes with held-out checks | Evaluation (benchmark not yet run on live models) |
+| Dataset | Labelled synthetic fixtures | Offline tests only |
+
+No model training or fine-tuning; no user data leaves the machine except the prompts and search queries sent to these APIs.
+
+## First real run, in detail
+
+Run `hr-20261115-104503-z4sl`, wish: *"I want a simple web page where I type in my restaurant bill and how many friends are sharing it, and it tells each person how much to pay, including the usual UK service charge."*
 
 | Step | What happened |
 |---|---|
 | Research | 4 live Linkup searches, 4 findings |
-| Plan | Claude Opus 5.5 wrote the plan; version 1 broke 2 of the harness's spec rules and was revised automatically |
-| Plan check | Shelf Life skill checked the plan's facts against live sources: 1 claim, 0 stale |
-| Approval | Auto-approved by Claude Sonnet 5.5, a different model from the planner (recorded as a model approval, not a user approval) |
-| Build | The planner chose each item's coder (Sonnet for item 1, Haiku for item 3). Item 2 failed twice; attempt 3 escalated to Claude Opus 5.5 and passed 8/8 |
-| Final test | 10 of 11 acceptance checks passed. The 11th, a visual check, was skipped because no headless browser was available, so the run is honestly reported as **partial**, not delivered |
+| Plan | Opus 5.5 wrote the plan. Version 1 broke 2 of the harness's own spec rules, so it was revised automatically |
+| Plan check | The Shelf Life skill checked the plan's facts with Linkup: 1 claim, 0 stale |
+| Approval | Auto-approved by Sonnet 5.5, a different model from the planner. Recorded as a model approval, never as a user approval |
+| Build | The planner chose the coder for each item. Item 2 failed twice, then attempt 3 escalated to Opus 5.5 and passed 8/8 |
+| Final test | 10 of 11 checks passed. The visual check was skipped because there was no headless browser, so the run is reported as **partial**, not delivered |
 | Final review | Ship, with 7 listed gaps |
 | Cost and time | $2.17, 9.0 minutes |
 
-An earlier attempt the same morning failed at planning because the planner's output hit a 4,096-token cap; that was fixed (PR #22) before this run.
+An earlier attempt the same morning failed at planning because the planner's output hit a 4,096-token cap. That was fixed in PR #22 before this run.
 
-## How it works
+## Quick start
 
-- [harness/README.md](harness/README.md): user guide
-- [harness/docs/ARCHITECTURE.md](harness/docs/ARCHITECTURE.md): the plan → plan check → review → build → test → reflect loop, budgets, keep-best, autonomy setting
-- [harness/docs/METHODOLOGY.md](harness/docs/METHODOLOGY.md): which published practices from Anthropic, OpenAI, Google DeepMind and DeepSeek each design rule follows, with sources
-- [harness/contracts/](harness/contracts/): the module interfaces, run artifacts, events and HTTP API
-- Sandbox: model-written code runs under Node's permission model (workspace-only file access, no child processes, no keys in its environment); acceptance tests run from a read-only frozen copy
+1. Node.js 20 or later. Nothing to install: zero dependencies.
+2. `cp apiConfig.example.json apiConfig.json` and paste your Anthropic and Linkup keys (git ignores the file), or add providers on the console's Setup page.
+3. `node harness/bin/shallowsee.mjs config check` shows which model each role gets, and tests each key.
+4. `node harness/bin/shallowsee.mjs run "I want a page that splits a restaurant bill between friends" --budget-usd 3`
+5. Or open the console: `node harness/console/server/index.mjs`, then go to http://127.0.0.1:4320. Finished web products open on a separate, isolated preview origin, http://127.0.0.1:4321.
 
-Offline test suite (no keys needed), 317 tests at the time of writing:
+Offline test suite (no keys needed): 318 tests pass on this commit's parent.
 
 ```sh
 node --test "apps/**/*.test.mjs" "eval/**/*.test.mjs" "packages/**/*.test.mjs" "harness/**/*.test.mjs"
 ```
 
-Built by Bill, LYM and Lynx with a team of coding agents, at Imperial AI Hack 2026.
+## Known limitations
 
----
+- One successful real run so far. The 6-wish benchmark has not yet been run on live models, so we don't quote a success rate.
+- Visual checks need a headless browser and a vision model; without them they are skipped, and the run is reported as partial.
+- Only Anthropic and Linkup have been used live. The other provider presets are implemented and unit-tested.
+- Handling for when the user's API quota is exhausted (route around the provider, or pause with a resume time) is in review, and the console doesn't show a quota banner yet.
 
-> **Earlier README (team history).** The text below predates the harness above, and its status notes about what is "not yet implemented" are out of date.
+## Read more
 
-# ShallowSee Harness · 许愿式编程
+- [harness/README.md](harness/README.md): user guide
+- [harness/docs/ARCHITECTURE.md](harness/docs/ARCHITECTURE.md): the loop, budgets, keep-best and the autonomy setting
+- [harness/docs/METHODOLOGY.md](harness/docs/METHODOLOGY.md): the published agent-building practices from Anthropic, OpenAI, Google DeepMind and DeepSeek behind each design rule, with sources
+- [harness/contracts/](harness/contracts/): module interfaces, run artifacts, events and the HTTP API
+- [docs/archive/README-earlier.md](docs/archive/README-earlier.md): the team's earlier design notes
 
-ShallowSee 的产品目标是：用户提出想法，Harness 根据用户当前目的和项目状态，调度售前、规划、项目经理、开发、测试和售后 Agent，完成从想法到软件交付的全过程。各岗位采用不同模型配置控制成本；只有售前、规划和项目经理可以使用搜索 API 核实成熟方案与实时事实。
-
-默认流程是：**需求澄清 → 方案规划 → 用户确认方案 → 编程 Agent 开发 → 项目经理编写使用说明 → 独立测试与返工 → 交付与售后**。完整职责、意图路由、模型策略、权限和实施顺序见 [许愿式编程产品与架构定义](docs/WISH-CODING.md)。这是最新用户目标，取代旧文档中 Shelf Life 优先、通用 Harness 后置的范围说明。
-
-**当前实现仍以 Shelf Life 文档核查为主**：已有本地日志、只读工作台、特定审计流程和离线评测，尚未实现上面的完整岗位调度与生产闭环。下面的启动方法用于查看现有工作台；Shelf Life 作为已有核查能力和历史演示保留。
-
-## Run the workbench
-
-The workbench reads the shared event log and shows the execution timeline, findings with sources, and reliability evidence. It has no external dependencies. Use Node.js 20 or later; local verification uses Node.js 24.
-
-From the repository root:
-
-```sh
-node apps/server/index.mjs
-```
-
-Open **http://127.0.0.1:4318**. The bundled example is clearly labeled **synthetic / replay**; it does not call a model, perform a search or open a pull request.
-
-Real workflow logs are discovered under `data/rooms/<roomId>/events.jsonl`. The page follows appended events and reconnects using the per-room sequence cursor. The workflow producer is developed separately; the workbench does not yet start an audit itself.
-
-## What is available
-
-- Local read-only HTTP and SSE event service.
-- Run timeline, claim verdicts, source links, checks, patches and review evidence.
-- Replay and synthetic-data labels; direct workflow runs are distinguished from harness-driven runs.
-- Usage subtotals with missing measurements preserved as unknown.
-- Handling of incomplete log tails and errors, without modifying the log.
-- [Direct audit runner](docs/DIRECT.md), including an offline synthetic command and bounded provider adapters; live accounts remain unverified. With `--open-pr` it can publish a validated patch as a branch and a pull request for a person to approve; that path is tested against a local Git remote and a simulated GitHub API, not yet against GitHub.
-- [Offline evaluation](docs/EVALUATION.md), with independent gold and an unreviewed draft generator for new logs.
-
-The complete wish-driven software-production harness is not yet implemented. Existing Shelf Life provider integrations also need live verification. An ended model run is not accepted work; acceptance is recorded separately with evidence.
-
-## Development
-
-- [当前产品定义：许愿式编程](docs/WISH-CODING.md) — roles, routing, model policy, search permissions, handoffs and delivery gates.
-- [Event contract](docs/CONTRACT.md) — the shared interface.
-- [Workbench guide](docs/WORKBENCH.md) — transport, configuration and validation.
-- [Earlier Shelf Life demonstration plan](demo-plan.md) — historical workflow and delivery proposal.
-- [Coordination notes](coordination-notes.md) — current scope and earlier discussion.
-- [Sample log](samples/shelf-life-room.sample.jsonl) — generated example, not a real run.
-
-Validate the example contract:
-
-```sh
-node samples/validate-events.mjs samples/shelf-life-room.sample.jsonl
-```
-
-Run the offline test suite (no provider accounts required):
-
-```sh
-node --test apps/server/tests/server.test.mjs apps/web/tests/ui-model.test.mjs eval/tests/score.test.mjs eval/tests/prepare-review.test.mjs packages/event-log/tests/event-log.test.mjs packages/shelf-life/direct.test.mjs packages/shelf-life/publish.test.mjs
-```
-
-Keep API keys and access tokens in the relevant machine's environment. Do not put credentials in event payloads, screenshots, source files or commits. `data/` is local runtime output and is ignored by Git.
+Built by Bill, LYM and Lynx, with a team of coding agents, at Imperial AI Hack 2026.
