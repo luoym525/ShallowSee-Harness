@@ -206,6 +206,8 @@ interface FactCheck {
 ```
 The engine runs it on the workspace's `README.md` (if the product has one) after `final_review` and before `report`. Stale findings never change the run status; they go in REPORT.md under **Fact check** with their sources, marked "proposed, unreviewed".
 
+Wording rules for REPORT.md and the UI (room #273): the **Fact check** section covers both the plan check and the README check. A `skipped` or `failed` check is shown as **"not verified"** with its reason, never as "checked" or "current". A passed `independent_sources` check is described as "two different sites contained the value (mechanical check); editorial independence not reviewed", never as "independently confirmed".
+
 ## `progress.md` — structured notes (engine appends; builder and reflector read)
 
 ```markdown
