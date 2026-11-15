@@ -17,16 +17,24 @@ function factCheckSection(label, fc) {
 }
 
 export function fallbackReport({ wish, brief, spec, status, reason, finalReport, finalReview, planCheck, factCheck, planReview,
-  spend, minutes, models, iterations, fileList }) {
+  spend, minutes, models, iterations, fileList, paused }) {
   const out = [];
   out.push('# Report', '', `_This report was written by the engine without a model, because ${line(reason) || 'the reporter did not run'}._`, '');
   out.push('## What you asked for', '', line(wish), '');
   out.push('## What you got', '');
-  const statusText = { delivered: 'The product was delivered and passed every check.', partial: 'A partial product was built; some checks did not pass.',
+  const statusText = { delivered: 'The product was delivered and passed every check.', partial: paused ? 'The run stopped before the product could be completed.' : 'A partial product was built; some checks did not pass.',
     failed: 'No working product was delivered.', cancelled: 'The run was cancelled before it finished.' }[status] ?? `Status: ${status}.`;
   out.push(`${statusText}${spec?.title ? ` Product: ${line(spec.title)}.` : brief?.title ? ` Product idea: ${line(brief.title)}.` : ''} ${reason ? `Reason: ${line(reason)}.` : ''}`.trim(), '');
+  if (paused) {
+    const when = paused.resumeAt ? 'The earliest reported reset is ' + paused.resumeAt + '.' : 'The provider did not supply a reset time.';
+    out.push('The run stopped during ' + line(paused.phase) + (paused.itemId ? ' at ' + line(paused.itemId) : '') + '.',
+      when, 'Completed work items: ' + (paused.completed.join(', ') || 'none') + '.',
+      ...(paused.bestCommit ? ['Saved best commit: `' + paused.bestCommit + '`.'] : []),
+      'Start a fresh run after the quota resets, or configure another provider in Setup and run the wish again.', '');
+  }
   out.push('## How to use it', '');
-  if (spec?.entry?.kind === 'open_html') out.push(`Open \`workspace/${spec.entry.path}\` in a browser.`);
+  if (paused && !fileList?.length) out.push('Nothing to run yet.');
+  else if (spec?.entry?.kind === 'open_html') out.push(`Open \`workspace/${spec.entry.path}\` in a browser.`);
   else if (spec?.entry?.kind === 'command') out.push(`In the \`workspace\` folder run: \`${(spec.entry.run ?? []).join(' ')}\``);
   else if (spec?.entry?.kind === 'server') out.push(`In the \`workspace\` folder run \`${(spec.entry.run ?? []).join(' ')}\`, then open http://127.0.0.1:${spec.entry.port}${spec.entry.path}`);
   else out.push('Nothing to run yet.');

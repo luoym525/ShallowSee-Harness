@@ -102,6 +102,8 @@ class Run {
     this.stateQueue = Promise.resolve();
     this.pendingEmits = new Set();
     this.openTools = [];
+    this.exhaustedProviders = new Map();
+    this.quotaPause = null;
     this.planCorrections = new Map();   // stale fact line → { text, sources }, see plan-facts.mjs
     this.lastItemReport = null;
 
@@ -183,7 +185,23 @@ class Run {
       } catch (inner) {
         if (this.signal.aborted || inner instanceof CancelledError) {
           this.outcome = { status: 'cancelled', reason: this.cancelReason ?? 'The run was cancelled.' };
+        } else if (inner?.code === 'quota_exhausted' || inner === this.quotaPause) {
+          this.note('engine', 'The final check could not continue after the run budget was reached.');
         } else this.recordFatal(inner);
+      }
+      return;
+    }
+    if (error === this.quotaPause) {
+      this.outcome = { status: 'partial', reason: error.message };
+      if (!this.state.best && this.best?.commit) this.state.best = { commit: this.best.commit, score: this.best.score };
+      if (this.spec) {
+        const progress = join(this.runDir, 'progress.md');
+        try {
+          await appendFile(progress, '\n## Paused for API quota\n\n' + error.message + '\n', 'utf8');
+          await this.registerArtifact('progress.md', await readFile(progress, 'utf8'), 'file');
+        } catch {
+          this.note('engine', 'The quota checkpoint could not be added to progress.md.');
+        }
       }
       return;
     }
@@ -283,6 +301,7 @@ class Run {
   afterCall() {
     this.throwIfCancelled();
     if (this.limitHit && !this.wrapUp) throw new LimitExceededError(this.limitHit);
+    if (this.quotaPause) throw this.quotaPause;
   }
 
   budgetRemaining() { return Math.max(0, this.limits.maxUsdPerRun - this.spendAcc.knownUsd); }
@@ -315,31 +334,87 @@ class Run {
 
   // ---------------------------------------------------------------- routing and model calls
 
+  selectAvailable(request, tried = new Set(), tier = null) {
+    const avoidProviders = [...this.exhaustedProviders.keys()];
+    const roster = this.roster.filter(model => !this.exhaustedProviders.has(model.providerId ?? providerOf(model.ref))
+      && !tried.has(model.ref) && (tier === null || model.tier === tier));
+    if (!roster.length) return null;
+    const pick = req => {
+      try {
+        return this.deps.router.selectModel({ ...req, avoidProviders }, roster, this.routerOpts);
+      } catch (error) {
+        if (!['no_match', 'no_models'].includes(error?.code)) throw error;
+        return null;
+      }
+    };
+    const choice = pick(request);
+    if (choice || !(request.avoidModels?.length || request.avoidVendors?.length)) return choice;
+    // Relax independence only. Exhausted providers and models already tried stay excluded.
+    const relaxed = pick({ ...request, avoidModels: [], avoidVendors: [] });
+    return relaxed ? {
+      ...relaxed, independenceRelaxed: true,
+      reason: relaxed.reason + ' (no other suitable model is configured, so the model to avoid was allowed)',
+    } : null;
+  }
+
   async route(req, purpose) {
     this.checkLimits();
     const request = { ...req, budgetRemainingUsd: this.budgetRemaining() };
-    let decision;
-    try {
-      decision = this.deps.router.selectModel(request, this.roster, this.routerOpts);
-    } catch (error) {
-      if (error?.code !== 'no_match' || !(request.avoidModels?.length || request.avoidVendors?.length)) throw error;
-      // Only one suitable model is configured: independence is impossible, so say so instead of failing.
-      decision = this.deps.router.selectModel({ ...request, avoidModels: [], avoidVendors: [] }, this.roster, this.routerOpts);
-      decision = { ...decision, reason: `${decision.reason} (no other suitable model is configured, so the model to avoid was allowed)`, independenceRelaxed: true };
+    const decision = this.selectAvailable(request);
+    if (!decision) {
+      if (this.exhaustedProviders.size) {
+        if (!this.limitHit) throw this.pauseForQuota();
+        throw new EngineError('quota_exhausted', 'No provider is available for the final check.');
+      }
+      throw new EngineError('no_match', 'No available model meets the requirements for ' + req.role + '.');
     }
     await this.emit('harness.route.selected', {
       role: req.role, model: decision.model, tier: decision.tier ?? null, rule: decision.rule ?? null, reason: decision.reason ?? '',
       escalated: decision.escalated === true, pinned: decision.pinned === true, attempt: req.attempt ?? 1,
       purpose, suggested: decision.suggested === true,
     });
-    return decision;
+    return { ...decision, request };
+  }
+
+  pauseForQuota() {
+    if (this.quotaPause) return this.quotaPause;
+    const resets = [...this.exhaustedProviders.values()].filter(value => value && Date.parse(value) > this.nowMs()).sort();
+    const error = new EngineError('api_quota', 'The available providers have reached their API quota for this run.');
+    error.resumeAt = resets[0] ?? null;
+    error.phase = this.state.phase;
+    error.itemId = this.state.currentItemId;
+    this.quotaPause = error;
+    return error;
+  }
+
+  async limitReplacement(binding, model, error, tried, canTryRate) {
+    const provider = providerOf(model);
+    const kind = error.code;
+    const resetMs = typeof error.resetAt === 'string' ? Date.parse(error.resetAt) : NaN;
+    const resetAt = Number.isFinite(resetMs) && resetMs > this.nowMs() ? iso(resetMs) : null;
+    if (kind === 'quota_exhausted') this.exhaustedProviders.set(provider, resetAt);
+    this.checkLimits();
+    const tier = this.roster.find(entry => entry.ref === model)?.tier ?? null;
+    const request = { ...binding.decision.request, budgetRemainingUsd: this.budgetRemaining() };
+    const canRetry = !this.limitHit && (kind === 'quota_exhausted' || canTryRate);
+    const sameTier = canRetry && tier !== null ? this.selectAvailable(request, tried, tier) : null;
+    const next = sameTier ?? (canRetry && kind === 'quota_exhausted' ? this.selectAvailable(request, tried) : null);
+    const label = kind === 'quota_exhausted' ? 'API quota reached' : 'API temporarily rate limited';
+    const timing = resetAt ? ' until ' + resetAt : '';
+    const fallback = next && (!binding.pinned || binding.attempt === 1);
+    const action = fallback ? ', continuing with ' + providerOf(next.model)
+      : next ? ', the pinned check ended' : ', no fallback is available';
+    await this.emit('harness.provider.limited', {
+      provider: this.redact(provider), kind, resetAt, reason: this.redact(provider + ' ' + label + timing + action + '.'),
+    });
+    return next;
   }
 
   binding(role, decision, { purpose, attempt = 1, taskId, pinnedModel } = {}) {
     // Primary first, then the router's fallbacks in order; a repeated model is never retried.
     const models = pinnedModel ? [pinnedModel]
       : [...new Set([decision.model, ...(Array.isArray(decision.fallbacks) ? decision.fallbacks : [])])].filter(m => typeof m === 'string' && m);
-    return { role, decision, purpose, attempt, taskId, models, active: 0, pinned: Boolean(pinnedModel), pinnedFailed: false,
+    return { role, decision, purpose, attempt, taskId, models, active: 0, pinned: Boolean(pinnedModel), pinnedFailed: false, pinnedReplacement: null,
       lastCallId: null, reservedCallId: null };
   }
 
@@ -354,8 +429,16 @@ class Run {
    */
   async callModel(binding, req) {
     this.checkLimits();
+    if (this.quotaPause) throw this.quotaPause;
+    const tried = new Set();
+    let rateFallbacks = 0;
     for (let i = binding.active; i < binding.models.length; i++) {
       const model = binding.models[i];
+      if (tried.has(model) || this.exhaustedProviders.has(providerOf(model))) continue;
+      this.checkLimits();
+      req?.signal?.throwIfAborted();
+      tried.add(model);
+      binding.active = i;
       const callId = binding.reservedCallId ?? this.nextCallId();
       binding.reservedCallId = null;
       binding.lastCallId = callId;
@@ -378,11 +461,28 @@ class Run {
           retryable: error?.retryable === true, usage, durationMs: Math.max(0, this.nowMs() - t0),
         }, opts);
         this.throwIfCancelled();
+        req?.signal?.throwIfAborted();
+        if (error?.code === 'quota_exhausted' || error?.code === 'rate_limit') {
+          const canTryRate = binding.pinned ? binding.attempt === 1 : rateFallbacks < 2;
+          const replacement = await this.limitReplacement(binding, model, error, tried, canTryRate);
+          if (error.code === 'quota_exhausted' && !replacement && !this.limitHit) throw this.pauseForQuota();
+          if (binding.pinned && binding.attempt === 1 && replacement) {
+            binding.pinnedFailed = true;
+            binding.pinnedReplacement = replacement.model;
+          } else if (!binding.pinned && replacement) {
+            if (error.code === 'rate_limit') rateFallbacks++;
+            binding.models.splice(i + 1, binding.models.length, replacement.model, ...(replacement.fallbacks ?? []));
+            binding.active = i + 1;
+            continue;
+          }
+          throw error;
+        }
         const nonRetryable = error?.retryable === false;
         if (nonRetryable && binding.pinned) binding.pinnedFailed = true;
-        if (nonRetryable && !binding.pinned && i + 1 < binding.models.length) {
-          binding.active = i + 1;
-          this.note('engine', `${model} failed (${error?.code ?? 'error'}); trying the fallback ${binding.models[i + 1]}.`);
+        const nextIndex = binding.models.findIndex((ref, index) => index > i && !tried.has(ref) && !this.exhaustedProviders.has(providerOf(ref)));
+        if (nonRetryable && !binding.pinned && nextIndex >= 0) {
+          binding.active = nextIndex;
+          this.note('engine', `${model} failed (${error?.code ?? 'error'}); trying the fallback ${binding.models[nextIndex]}.`);
           continue;
         }
         throw error;
@@ -398,6 +498,7 @@ class Run {
       this.throwIfCancelled();
       return result;
     }
+    if (this.exhaustedProviders.size && !this.limitHit) throw this.pauseForQuota();
     throw new EngineError('no_model', 'No model was available for this call.');
   }
 
@@ -514,7 +615,8 @@ class Run {
     let lastReview = null;
     for (let round = 0; round <= MAX_PLAN_REVISIONS; round++) {
       await this.setPhase('plan');
-      const input = { brief: this.brief, research: this.research, roster: this.rosterSummary, ...(revision ? { revision } : {}) };
+      const roster = this.rosterSummary.filter(model => !this.exhaustedProviders.has(providerOf(model.ref)));
+      const input = { brief: this.brief, research: this.research, roster, ...(revision ? { revision } : {}) };
       const purpose = revision?.replanReason ? 'replan' : revision ? `revise plan (round ${round + 1})` : 'plan';
       const { out: raw, binding: planBinding } = await this.invokeRole('planner', this.deps.roles.planner, input, {}, { purpose, search: true });
       const spec = { ...raw, specVersion: ++this.specVersionCounter };
@@ -635,7 +737,9 @@ class Run {
         }
         r = normalizeFactCheck(r, base);
         const limitStopped = this.signal.aborted || (this.limitHit && !this.wrapUp) || this.softLimitHit;
-        if (r.status === 'failed' && binding.pinnedFailed && !limitStopped && i + 1 < candidates.length) {
+        const nextCandidate = binding.pinnedReplacement ?? candidates[i + 1];
+        if (binding.pinnedFailed && (r.status === 'failed' || binding.pinnedReplacement) && !limitStopped && i === 0 && nextCandidate) {
+          candidates[1] = nextCandidate;
           await this.emit('harness.skill.completed', {
             ...meta, childRoomId, status: r.status, findingCount: r.findings.length, staleCount: countStale(r),
             searchesUsed: r.searchesUsed, reportPath: null, rerunWith: candidates[i + 1],
@@ -809,7 +913,7 @@ class Run {
         }, { attempt }, { purpose: `reflect ${item.id}`, taskId: item.id });
         reflection = out;
       } catch (error) {
-        if (this.signal.aborted || error instanceof CancelledError || error instanceof LimitExceededError) throw error;
+        if (this.signal.aborted || error instanceof CancelledError || error instanceof LimitExceededError || error === this.quotaPause) throw error;
         this.note('engine', `The reflector failed (${error?.code ?? 'error'}); the engine decides from the test results.`);
         reflection = { itemId: item.id, decision: itemPassed ? 'next' : 'retry', reason: 'The reflector failed; decided from the test results.', fixInstructions: null, lessons: [] };
       }
@@ -988,7 +1092,7 @@ class Run {
       ({ out: raw, binding } = await this.invokeRole('reviewer', this.deps.roles.reviewer.reviewFinal,
         { brief: this.brief, spec: this.spec, testReport: this.finalReport, fileList, readmeExcerpt }, {}, { purpose: 'final_review' }));
     } catch (error) {
-      if (this.signal.aborted || error instanceof CancelledError || error instanceof LimitExceededError) throw error;
+      if (this.signal.aborted || error instanceof CancelledError || error instanceof LimitExceededError || error === this.quotaPause) throw error;
       this.note('engine', `The final review failed (${error?.code ?? 'error'}); the product cannot be marked delivered.`);
       this.finalReview = null;
       return;
@@ -1018,7 +1122,7 @@ class Run {
     try {
       this.factCheck = await this.runSkill('fact_check', { label: 'README.md', markdown }, 'fact-check.json');
     } catch (error) {
-      if (this.signal.aborted || error instanceof CancelledError) throw error;
+      if (this.signal.aborted || error instanceof CancelledError || error === this.quotaPause) throw error;
       // A skill failure never fails the run; findings never change the run status.
       this.note('engine', `The fact check did not complete (${error?.code ?? 'error'}).`);
     } finally {
@@ -1062,7 +1166,7 @@ class Run {
       await this.setPhase('report');
     } catch { /* setPhase never blocks the report */ }
     const fileList = this.workspace ? await this.safeFileList() : [];
-    if (!cancelled && this.brief && this.spec && this.finalReport && this.deps?.roles?.reporter) {
+    if (!cancelled && !this.quotaPause && this.brief && this.spec && this.finalReport && this.deps?.roles?.reporter) {
       this.wrapUp = true;   // the report is always written, whatever the budget
       try {
         const { out } = await this.invokeRole('reporter', this.deps.roles.reporter, {
@@ -1073,6 +1177,7 @@ class Run {
         if (typeof out === 'string' && out.trim()) markdown = out;
       } catch (error) {
         if (this.signal.aborted) this.outcome = { status: 'cancelled', reason: this.cancelReason ?? 'The run was cancelled.' };
+        else if (error === this.quotaPause) await this.handleStop(error);
         else this.note('engine', `The reporter failed (${error?.code ?? 'error'}); the engine wrote the report.`);
       }
     }
@@ -1082,12 +1187,18 @@ class Run {
       // The reporter does not know about this check, so the engine states it itself, after the reporter's text.
       if (markdown) markdown = `${markdown.trimEnd()}\n\n> Engine note: every check passed, but this run is not marked delivered because ${gap}.\n`;
     }
-    const reason = this.outcome?.reason ?? (status === 'delivered' ? null : gap ? `every check passed but ${gap}` : this.limitHit ? `the ${this.limitHit} limit was reached` : null);
+    const reason = this.outcome?.reason ?? this.quotaPause?.message ?? (status === 'delivered' ? null : gap ? `every check passed but ${gap}` : this.limitHit ? `the ${this.limitHit} limit was reached` : null);
     if (!markdown) {
       markdown = fallbackReport({
         wish: this.wish, brief: this.brief, spec: this.spec, status: this.decideStatus(),
         reason: reason ?? (this.finalReport ? 'the reporter did not produce a report' : 'the run ended before a product was built'),
-        finalReport: this.finalReport, finalReview: this.finalReview, planCheck: this.planCheck, factCheck: this.factCheck,
+        finalReport: this.finalReport ?? ((this.quotaPause || this.limitHit) ? this.lastItemReport : null), finalReview: this.finalReview,
+        planCheck: this.planCheck, factCheck: this.factCheck,
+        paused: this.quotaPause && !this.limitHit && this.decideStatus() === 'partial' ? {
+          resumeAt: this.quotaPause.resumeAt, phase: this.quotaPause.phase, itemId: this.quotaPause.itemId,
+          bestCommit: this.state.best?.commit,
+          completed: Object.entries(this.state.items).filter(([, item]) => item.status === 'passed').map(([id]) => id),
+        } : null,
         planReview: this.planReview, spend: this.state.spend, minutes: this.elapsedMinutes(), models: this.state.models,
         iterations: this.state.iteration, fileList,
       });
@@ -1103,8 +1214,9 @@ class Run {
   decideStatus() {
     if (this.outcome?.status === 'cancelled') return 'cancelled';
     if (this.outcome?.status === 'failed') return 'failed';
+    if (this.quotaPause && !this.limitHit) return 'partial';
     return decideStatus({
-      finalReport: this.finalReport, finalReview: this.finalReview, approvedSpecVersion: this.approvedSpecVersion,
+      finalReport: this.finalReport ?? (this.limitHit ? this.lastItemReport : null), finalReview: this.finalReview, approvedSpecVersion: this.approvedSpecVersion,
       specVersion: this.spec?.specVersion ?? null, limitHit: this.limitHit, fatal: false, candidateCheck: this.candidateCheck,
     });
   }
@@ -1126,12 +1238,17 @@ class Run {
     const minutes = Math.round(this.elapsedMinutes() * 100) / 100;
     const finalScore = typeof this.finalReport?.score === 'number' ? this.finalReport.score : null;
     const allPassed = reportAllPassed(this.finalReport);
+    const checks = (this.finalReport ?? (this.limitHit ? this.lastItemReport : null))?.summary;
     const summaryText = status === 'delivered' ? 'Delivered: every check passed and the final review said ship.'
-      : status === 'partial' ? `Partial: ${this.finalReport?.summary?.passed ?? 0} of ${this.finalReport?.summary?.total ?? 0} checks passed${this.bindingGap() ? `; not delivered because ${this.bindingGap()}` : ''}.`
+      : status === 'partial' && this.quotaPause && !this.limitHit ? this.quotaPause.message
+      : status === 'partial' ? `Partial: ${checks?.passed ?? 0} of ${checks?.total ?? 0} checks passed${this.bindingGap() ? `; not delivered because ${this.bindingGap()}` : ''}.`
       : status === 'cancelled' ? `Cancelled: ${this.cancelReason ?? 'by the user'}.`
       : `Failed: ${this.outcome?.reason ?? 'no check passed'}.`;
+    const pause = status === 'partial' && this.quotaPause && !this.limitHit
+      ? { pausedReason: 'api_quota', resumeAt: this.quotaPause.resumeAt } : {};
     this.state.status = status;
     this.state.currentItemId = null;
+    Object.assign(this.state, pause);
     this.state.finishedAt = iso(finishedMs);
     try {
       await this.emit('harness.phase.changed', { phase: 'done', previous: this.lastPhase, iteration: this.state.iteration, itemId: null });
@@ -1142,7 +1259,7 @@ class Run {
         specVersion: this.spec?.specVersion ?? null, approvedSpecVersion: this.approvedSpecVersion,
         finalReviewVerdict: this.finalReview?.verdict ?? null, reportPath: this.reportPath ? 'REPORT.md' : null,
         candidateCheck: this.candidateCheck ? { ok: this.candidateCheck.ok, reason: this.candidateCheck.reason } : null,
-        previewPath: this.state.previewPath, spentUsd: this.state.spend.usd, minutes,
+        previewPath: this.state.previewPath, spentUsd: this.state.spend.usd, minutes, ...pause,
       });
       await this.emit('room.closed', {
         status: status === 'cancelled' ? 'cancelled' : status === 'failed' ? 'failed' : 'completed',
@@ -1155,7 +1272,7 @@ class Run {
     }
     return {
       runId: this.runId, status, finalScore, spentUsd: this.state.spend.usd, minutes,
-      reportPath: this.reportPath ?? null, workspaceDir: this.workspaceDir, previewPath: this.state.previewPath,
+      reportPath: this.reportPath ?? null, workspaceDir: this.workspaceDir, previewPath: this.state.previewPath, ...pause,
     };
   }
 

@@ -28,9 +28,10 @@ export function buildRoster(config, { catalog = DEFAULT_CATALOG } = {}) {
   });
 }
 
-function invalidChoice(ref, roster, required, avoided) {
+function invalidChoice(ref, roster, required, avoided, unavailable) {
   const model = roster.find(entry => entry.ref === ref);
   if (!model) return 'is not configured';
+  if (unavailable.has(model.providerId)) return 'belongs to an unavailable provider';
   const missing = required.filter(capability => !model.capabilities.includes(capability));
   if (missing.length) return 'lacks ' + missing.join(', ');
   if (avoided.has(ref)) return 'is excluded for this task';
@@ -42,19 +43,22 @@ export function selectModel(req, roster, {
 } = {}) {
   if (!roster.length) throw new RouterError('no_models', 'Add a model provider on the Setup page to get started.');
 
-  const { role, attempt = 1, difficulty, needs = [], avoidModels = [], avoidVendors = [], budgetRemainingUsd } = req;
+  const { role, attempt = 1, difficulty, needs = [], avoidModels = [], avoidVendors = [], avoidProviders = [], budgetRemainingUsd } = req;
   const rolePolicy = Object.hasOwn(policy, role) ? policy[role] : null;
   if (!rolePolicy) throw new RouterError('no_match', 'No routing policy exists for this role.');
   const required = [...new Set([...rolePolicy.requires, ...needs])];
   const avoided = new Set(avoidModels);
+  const unavailable = new Set(avoidProviders);
+
   const candidates = roster.filter(model =>
-    !avoided.has(model.ref) && required.every(capability => model.capabilities.includes(capability)));
+    !unavailable.has(model.providerId) && !avoided.has(model.ref)
+    && required.every(capability => model.capabilities.includes(capability)));
   if (!candidates.length) throw new RouterError('no_match', 'No available model meets the requirements for ' + role + '.');
 
   const pin = overrides[role];
-  const pinIssue = pin ? invalidChoice(pin, roster, required, avoided) : null;
+  const pinIssue = pin ? invalidChoice(pin, roster, required, avoided, unavailable) : null;
   const suggestion = role === 'builder' ? req.suggested : null;
-  const suggestionIssue = suggestion ? invalidChoice(suggestion, roster, required, avoided) : null;
+  const suggestionIssue = suggestion ? invalidChoice(suggestion, roster, required, avoided, unavailable) : null;
   const validSuggestion = suggestion && !suggestionIssue ? candidates.find(model => model.ref === suggestion) : null;
   const initialTier = validSuggestion?.tier ?? baseTier(role, difficulty, rolePolicy);
   const increasedTier = escalatedTier(initialTier, attempt, rolePolicy.escalation);
