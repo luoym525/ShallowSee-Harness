@@ -183,6 +183,7 @@ interface FinalReview {
 interface FactCheck {
   status: "completed" | "skipped" | "failed";
   reason: string | null;                 // why skipped or failed
+  childRoomId: string | null;            // "<runId>-fact-check": the skill's own event log
   doc: { label: string; sha256: string } | null;
   findings: {
     claimId: string; line: number; quote: string; statement: string;

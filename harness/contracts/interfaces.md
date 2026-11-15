@@ -370,13 +370,17 @@ interface Skill<I = unknown, O = unknown> {
 interface SkillContext {
   llm: RoleContext["llm"];                           // routed by the engine (role "researcher", purpose "fact_check")
   search: SearchClient["search"] | null;             // injected only when the skill declares needs.search
-  emit(type: `shelflife.${string}`, payload: object, opts?: { taskId?: string }): Promise<void>;
-                                                     // the engine appends to the run's event log; only the skill's own family
+  providerIdentity: { provider: string; model: ModelRef };   // trusted, from the engine's routing; recorded in the skill's events
+  childRoom: { rootDir: string; roomId: string; parentRoomId: string };
+                                                     // the skill writes its OWN event log here (roomId = "<runId>-fact-check"),
+                                                     // e.g. via packages/shelf-life runDirect; never into the parent run's log
   note(text: string): void;
-  signal: AbortSignal;
+  signal: AbortSignal;                               // checked before every model/search call and after each one settles
   now(): string;
 }
 ```
+
+**Invocation rules (engine-enforced):** skills are **never exposed as model-callable tools**. Only the engine invokes a skill, only in a phase listed in `allowedPhases`, and it records the executing role (`researcher`, which has search permission) in `harness.skill.started`. No model output can choose a skill, its role, keys or a publisher. A skill gets no `apiConfig`, no environment, no path outside the document text it is given.
 
 ### Shelf Life skill I/O
 
@@ -386,7 +390,7 @@ type ShelfLifeInput = { doc: { label: string; markdown: string };   // label = w
 type ShelfLifeOutput = FactCheck;                                    // artifacts.md "fact-check.json"
 ```
 
-Rules: no publisher, git push, PR or file write inside a run (the patch is returned as text for review only); no keys in input or output; search queries contain only the extracted public facts; `reviewStatus` is always `"unreviewed"` (a person, not a model, accepts corrections); provider charges are recorded as `null` unless measured. If `search` is null the skill returns `{ status: "skipped", reason: "no search provider" }` without calling the model.
+Rules: no publisher, git push, PR or file write inside a run, other than the skill's own child-room event log (the patch is returned as text for review only); no keys in input or output; search queries contain only the extracted public facts; `reviewStatus` is always `"unreviewed"` (a person, not a model, accepts corrections); provider charges are recorded as `null` unless measured. If `search` is null the skill returns `{ status: "skipped", reason: "no search provider" }` without calling the model.
 
 ## 9. `harness/console/web/` (workstream 08)
 

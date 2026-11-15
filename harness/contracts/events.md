@@ -42,8 +42,9 @@ Consumers ignore event types and fields they don't know (CONTRACT rule 5). Unkno
 | `harness.candidate.best` | `commit`, `score`, `previousBest: number \| null`, `reverted: boolean` (true when the engine reset to the best commit) |
 | `harness.budget.updated` | `spentUsd`, `usdSource`, `elapsedMinutes`, `iterations`, `limits`, `exceeded: null \| "usd" \| "minutes" \| "iterations"` |
 | `harness.final.reviewed` | `verdict`, `scores`, `gaps`, `reviewerModel` |
-| `harness.skill.started` / `harness.skill.completed` | `skillId`, `version`, `phase`, `docLabel` / plus `status`, `findingCount`, `staleCount`, `searchesUsed`, `reportPath: "fact-check.json"` |
-| `shelflife.*` (existing family, CONTRACT.md) | emitted by the Shelf Life skill through `ctx.emit` with the existing v1 payloads (`claim.extracted`, `search.completed`, `verdict.proposed`, `check.result`, `verdict.final`, `patch.proposed`); never `shelflife.pr.opened` inside a harness run |
+| `harness.skill.started` / `harness.skill.completed` | `skillId`, `version`, `phase`, `role: "researcher"`, `docLabel`, `childRoomId` / plus `status`, `findingCount`, `staleCount`, `searchesUsed`, `reportPath: "fact-check.json"` |
+
+The Shelf Life skill writes its full audit (its own `room.created` with optional `parentRoomId`, and the existing `shelflife.*` events from CONTRACT.md) into a **separate child room** `data/rooms/<runId>-fact-check/events.jsonl`, never into the parent run's log, so there are no duplicate `room.created` events and the team workbench can display it unchanged. Never `shelflife.pr.opened` inside a harness run.
 | `harness.run.finished` | `status: RunStatus`, `summary`, `finalScore`, `allPassed`, `candidate` (final commit), `specVersion`, `reportPath`, `previewPath`, `spentUsd`, `minutes` |
 
 ## Typical order (abridged)
