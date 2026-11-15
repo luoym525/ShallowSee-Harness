@@ -13,7 +13,7 @@ interface RunState {
   title: string | null;                 // from the spec once planned
   status: "running" | "awaiting_confirmation" | RunStatus;   // RunStatus = delivered | partial | failed | cancelled
   phase: "intake" | "research" | "plan" | "plan_review" | "awaiting_confirmation" | "scaffold" | "build" | "test"
-       | "reflect" | "final_test" | "final_review" | "report" | "done";
+       | "reflect" | "final_test" | "final_review" | "fact_check" | "report" | "done";
   autonomy: "full" | "confirm_plan";
   approval: { by: "model"; model: ModelRef; at: string; specVersion: number; specSha256: string; reviewRef: string; callId: string }
           | { by: "user"; at: string; specVersion: number; specSha256: string } | null;   // see PlanReview rules
@@ -177,6 +177,28 @@ interface FinalReview {
 }
 ```
 
+## `fact-check.json` — FactCheck (Shelf Life skill, phase `fact_check`)
+
+```ts
+interface FactCheck {
+  status: "completed" | "skipped" | "failed";
+  reason: string | null;                 // why skipped or failed
+  doc: { label: string; sha256: string } | null;
+  findings: {
+    claimId: string; line: number; quote: string; statement: string;
+    category: "price" | "version" | "rate" | "limit" | "date" | "policy" | "other";
+    verdict: "fresh" | "stale" | "unsure";
+    currentValue: string | null; correction: string | null;
+    sources: Source[];
+    checks: { check: "quote_in_doc" | "independent_sources" | "correction_supported" | "patch_scope"; passed: boolean; detail: string }[];
+  }[];
+  diff: string | null;                   // unified diff, zero context; proposal only, never applied during the run
+  reviewStatus: "unreviewed";
+  searchesUsed: number;
+}
+```
+The engine runs it on the workspace's `README.md` (if the product has one) after `final_review` and before `report`. Stale findings never change the run status; they go in REPORT.md under **Fact check** with their sources, marked "proposed, unreviewed".
+
 ## `progress.md` — structured notes (engine appends; builder and reflector read)
 
 ```markdown
@@ -189,4 +211,4 @@ interface FinalReview {
 
 ## `REPORT.md` — final report (reporter)
 
-Sections, in order: **What you asked for** · **What you got** (one paragraph) · **How to use it** (exact steps) · **What was checked** (table of checks with pass/fail) · **Known gaps** (from final review and failed checks, honest) · **Assumptions we made for you** · **Sources** · **How it was built** (models per role, iterations, time, cost; cost `unknown` when not measured).
+Sections, in order: **What you asked for** · **What you got** (one paragraph) · **How to use it** (exact steps) · **What was checked** (table of checks with pass/fail) · **Known gaps** (from final review and failed checks, honest) · **Fact check** (Shelf Life findings with sources, "proposed, unreviewed"; or why it was skipped) · **Assumptions we made for you** · **Sources** · **How it was built** (models per role, iterations, time, cost; cost `unknown` when not measured).

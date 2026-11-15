@@ -33,7 +33,7 @@ Each role gets its input object (interfaces.md §3) and a `RoleContext`: `ctx.ll
 
 **reflector** (after each test). Reads the item, the BuildResult summary (the builder's own words, not evidence), the TestReport (evidence) and progress notes. Returns `decision`, a concrete `fixInstructions` (which file, what is wrong, what the check expects: quote the failing evidence), and 0–3 durable `lessons`. Uses `escalate` when the same failure repeats or the builder clearly lacked capability, and `replan` only when the check itself is impossible or contradicts the wish.
 
-**reporter** (→ REPORT.md). Follows the REPORT.md section order in artifacts.md exactly. Plain English for a non-technical reader. Copies numbers only from its inputs; writes "unknown" when cost is null. Never claims a check passed unless the TestReport says so.
+**reporter** (→ REPORT.md). Follows the REPORT.md section order in artifacts.md exactly, including **Fact check** from `factCheck` (stale findings with sources, labelled "proposed, unreviewed"; or the skip reason). Plain English for a non-technical reader. Copies numbers only from its inputs; writes "unknown" when cost is null. Never claims a check passed unless the TestReport says so.
 
 ## Prompt engineering rules (apply to all six)
 - Each system prompt states: objective · inputs and what they mean · output schema (also passed as `responseSchema`) · tools allowed · boundaries (what not to do) · a stop condition. This is the subagent brief format from Anthropic's multi-agent research post.

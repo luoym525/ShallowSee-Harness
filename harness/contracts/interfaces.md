@@ -176,7 +176,7 @@ export const reviewer: {
 };
 export const reflector:  Role<{ spec: Spec; item: WorkItem; attempt: number; build: BuildResult; testReport: TestReport;
                                 progress: string; best: { commit: string; score: number } | null }, Reflection>;
-export const reporter:   Role<{ wish: string; brief: Brief; spec: Spec; finalReport: TestReport; finalReview: FinalReview;
+export const reporter:   Role<{ wish: string; brief: Brief; spec: Spec; finalReport: TestReport; finalReview: FinalReview; factCheck: FactCheck | null;
                                 status: RunStatus; spend: { usd: number | null; minutes: number }; fileList: string[] }, string>;  // Markdown
 
 export const SCHEMAS: { brief: object; research: object; spec: object; planReview: object; finalReview: object; reflection: object };
@@ -349,6 +349,44 @@ export function createConsoleServer(opts?: { port?: number; previewPort?: number
 ```
 
 Run with `node harness/console/server/index.mjs` → control UI and API on `http://127.0.0.1:4320`, product preview on the separate origin `http://127.0.0.1:4321`. Endpoints: [http-api.md](http-api.md).
+
+## 10. `harness/skills/index.mjs` — built-in skills (workstream 10, owner: Lynx's Sol; task authorised by Lynx in room #254)
+
+A skill is a reusable capability the engine can invoke inside a phase, with the same permission discipline as roles. The first one is **Shelf Life** (stale-fact audit of a Markdown document, reusing `packages/shelf-life`).
+
+```ts
+export const SKILLS: Record<string, Skill>;          // { "shelf-life": shelfLife }
+
+interface Skill<I = unknown, O = unknown> {
+  id: string;                                        // "shelf-life"
+  name: string; description: string;                // shown in the UI and usable in prompts
+  version: string;                                   // e.g. "1.0.0"
+  needs: { search: boolean; llm: boolean };
+  allowedPhases: string[];                           // shelf-life: ["fact_check"]
+  inputSchema: object; outputSchema: object;         // JSON Schema (validateJson subset)
+  run(input: I, ctx: SkillContext): Promise<O>;
+}
+
+interface SkillContext {
+  llm: RoleContext["llm"];                           // routed by the engine (role "researcher", purpose "fact_check")
+  search: SearchClient["search"] | null;             // injected only when the skill declares needs.search
+  emit(type: `shelflife.${string}`, payload: object, opts?: { taskId?: string }): Promise<void>;
+                                                     // the engine appends to the run's event log; only the skill's own family
+  note(text: string): void;
+  signal: AbortSignal;
+  now(): string;
+}
+```
+
+### Shelf Life skill I/O
+
+```ts
+type ShelfLifeInput = { doc: { label: string; markdown: string };   // label = workspace-relative path, e.g. "README.md"; ≤ 48,000 bytes
+                        maxClaims?: number };                        // 1–12, default 4
+type ShelfLifeOutput = FactCheck;                                    // artifacts.md "fact-check.json"
+```
+
+Rules: no publisher, git push, PR or file write inside a run (the patch is returned as text for review only); no keys in input or output; search queries contain only the extracted public facts; `reviewStatus` is always `"unreviewed"` (a person, not a model, accepts corrections); provider charges are recorded as `null` unless measured. If `search` is null the skill returns `{ status: "skipped", reason: "no search provider" }` without calling the model.
 
 ## 9. `harness/console/web/` (workstream 08)
 

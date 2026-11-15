@@ -33,6 +33,7 @@ Three core modules (Bill's words):
 | `console/server/` | Local HTTP + SSE server for the UI | Workstream 07 |
 | `console/web/` | English web UI, including the provider setup page | Workstream 08 |
 | `eval/`, `docs/demo/`, `README.md` | Benchmark wishes, scorer, demo script, user README | Workstream 09 |
+| `skills/` | Built-in skills; first: Shelf Life fact check (reuses `packages/shelf-life`) | Workstream 10 (Lynx's Sol) |
 | `tasks/reports/NN-*.md` | Each workstream's hand-back report (one file each) | Each workstream, own file only |
 
 ## Rules that are enforced, not suggested

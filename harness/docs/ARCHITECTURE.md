@@ -22,7 +22,8 @@ flowchart TD
     F -->|all items pass| FT[Final test: every check, clean start]
     FT --> FR{Final review<br/>strong model vs original wish}
     FR -->|iterate, bounded| B
-    FR -->|ship| D[Report + deliver<br/>how to run, evidence, honest gaps]
+    FR -->|ship| FC[Fact check<br/>Shelf Life skill audits the README's facts with Linkup]
+    FC --> D[Report + deliver<br/>how to run, evidence, honest gaps]
 ```
 
 The engine owns this state machine. Every arrow is code, not a model decision, except where a role returns a **label** (approve or revise, next or retry, ship or iterate) that the engine validates against hard rules first. For example, if every check passes the run moves on whatever the reflector says, and if the budget is spent the run stops whatever any model says.
@@ -41,6 +42,7 @@ The engine owns this state machine. Every arrow is code, not a model decision, e
 | `reflect` | reflector (`roles/`) | 2, 3 after repeated failures | `reflections/NNN.json`, `progress.md` |
 | `final_test` | tester | 2 | `tests/final.json` |
 | `final_review` | reviewer | 3 | `final-review.json` |
+| `fact_check` | Shelf Life skill (`skills/shelf-life`, reuses `packages/shelf-life`) + Linkup | 2 (role "researcher") | `fact-check.json` (skipped when no README or no search) |
 | `report` | reporter (`roles/`) | 2 | `REPORT.md` |
 
 Tiers: 1 = cheap and fast (for example Haiku 5.5), 2 = balanced (Sonnet 5.5), 3 = strongest (Opus 5.5, Fable 5.2). The router maps tiers to whatever models the user has configured; see `router/`.

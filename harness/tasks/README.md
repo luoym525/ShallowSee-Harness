@@ -15,6 +15,7 @@ Owner: PM session (bill-command). Clock: Sun 15 Nov 2026. Hard deadline: Devpost
 | 07 | [console-server.md](07-console-server.md): HTTP + SSE + preview | `harness/console/server/**` | 01, 02, 06 | M |
 | 08 | [console-web.md](08-console-web.md): English UI incl. CC Switch-style Setup | `harness/console/web/**` | HTTP + events contracts | L |
 | 09 | [eval-demo.md](09-eval-demo.md): held-out bench, scorer, README, video script | `harness/eval/**`, `harness/docs/demo/**`, `harness/README.md` | artifacts + events | M |
+| 10 | [shelf-life-skill.md](10-shelf-life-skill.md): Shelf Life as a built-in skill (**owner: Lynx's Sol**, authorised by Lynx #254) | `harness/skills/**` (+ `packages/shelf-life/**`, already Sol's) | 01 types, §10 | M |
 
 Every brief also owns exactly one hand-back file: `harness/tasks/reports/NN-<slug>.md`.
 
@@ -24,7 +25,7 @@ Every brief also owns exactly one hand-back file: `harness/tasks/reports/NN-<slu
 
 1. **Wave 0 (done by PM):** contracts branch `bill/harness-contracts`. Every workstream branches from its tip.
 2. **Wave 1 (start now, about 4 h, all nine in parallel):** build against the contracts; fake every other module in your own tests. Push your branch and write your hand-back report as soon as your Definition of Done passes. Don't wait for others.
-3. **Wave 2 (integration, about 05:00–06:30):** merge in dependency order **01 → 02 → 04 → 05 → 03 → 06 → 07 → 08 → 09**. Because write paths are disjoint, these merges cannot conflict. Then the PM session runs the end-to-end check with real keys and fixes cross-module bugs on a branch `bill/harness-integration`.
+3. **Wave 2 (integration, about 05:00–06:30):** merge in dependency order **01 → 02 → 04 → 05 → 10 → 03 → 06 → 07 → 08 → 09**. Because write paths are disjoint, these merges cannot conflict. Then the PM session runs the end-to-end check with real keys and fixes cross-module bugs on a branch `bill/harness-integration`.
 4. **Wave 3 (06:30–11:00):** real demo runs, eval numbers, video, README polish, submit.
 
 ## How to work (every workstream)
