@@ -155,6 +155,34 @@ test('a wrong Fahrenheit number containing the expected digits does not pass', a
   assert.equal(row.passed, 2);
 });
 
+test('a tenfold error in every multiplication result cannot pass the held-out rows', async t => {
+  const dataDir = await makeTemp(t);
+  const sample = getWish('times-table');
+  const manifest = oneRun(sample.id, 1);
+  const runId = 'hr-20261115-073305-wrng';
+  await makeRun(dataDir, sample.wish, runId, {
+    code: 'const factor = +process.argv[2]; for (let i = 1; i <= 12; i++) console.log(factor + " x " + i + " = " + factor * i * 10);',
+  });
+  manifest.trials.push({ wishId: sample.id, trial: 1, runId, status: 'delivered', startedAt: stamp });
+  const [row] = (await scoreManifest(manifest, { dataDir })).rows;
+  assert.equal(row.heldOutStatus, 'fail');
+  assert.equal(row.passed, 0);
+});
+
+test('digits in a scientific exponent do not equal the expected numeric output', async t => {
+  const dataDir = await makeTemp(t);
+  const sample = getWish('unit-converter');
+  const manifest = oneRun(sample.id, 1);
+  const runId = 'hr-20261115-073306-expt';
+  await makeRun(dataDir, sample.wish, runId, {
+    code: 'if (process.argv[3] === "oops") process.exit(1); console.log(process.argv[2] === "c-to-f" ? "1e14" : "15.53");',
+  });
+  manifest.trials.push({ wishId: sample.id, trial: 1, runId, status: 'delivered', startedAt: stamp });
+  const [row] = (await scoreManifest(manifest, { dataDir })).rows;
+  assert.equal(row.heldOutStatus, 'fail');
+  assert.equal(row.passed, 2);
+});
+
 test('pass@k and pass^k keep failures and errors in the denominator', () => {
   const rows = ['pass', 'pass', 'fail', 'error', 'timed_out'].map(heldOutStatus => ({ wishId: 'wish', heldOutStatus }));
   const [group] = summarize(rows, 2);

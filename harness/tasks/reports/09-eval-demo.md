@@ -13,10 +13,10 @@ Branch `lynx/09-eval-demo`. Implementation commit `35f20511e9781987a579556460acf
 
 ```text
 node --test "harness/eval/**/*.test.mjs"
-tests 7     pass 7     fail 0     skipped 0
+tests 9     pass 9     fail 0     skipped 0
 ```
 
-Tests used temporary labelled synthetic run folders, real Git commits, and the real sandbox and tester. They check that the committed candidate is used even after the original worktree moves, that invalid numeric results and hidden script/head/comment text do not pass, and that a timeout reduces a perfect rate to one out of two. The runner also records an interrupted attempt as incomplete and includes it in the denominator. No real model or search calls were made.
+Tests used temporary labelled synthetic run folders, real Git commits, and the real sandbox and tester. They check that the committed candidate is used even after the original worktree moves, that invalid numeric results and hidden script/head/comment text do not pass, and that a timeout reduces a perfect rate to one out of two. The runner also records an interrupted attempt as incomplete and includes it in the denominator. For review #439, the multiplication probes require full lines for all twelve rows. Numeric probes consume complete signed, decimal and exponent tokens. The regression candidates with tenfold products and misleading scientific notation fail their held-out checks. No real model or search calls were made.
 
 ## Limits and pending evidence
 

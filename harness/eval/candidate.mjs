@@ -58,10 +58,21 @@ function visibleHtml(html) {
     .replace(/\s+/g, ' ').trim();
 }
 
-function numericOutputMatches(expected, output) {
-  const numbers = output.match(/-?\d+(?:\.\d+)?/g) ?? [];
-  return expected.filter(value => /^-?\d+(?:\.\d+)?$/.test(value)).every(value =>
-    numbers.some(actual => value.includes('.') ? value === actual : Number(value) === Number(actual)));
+const NUMERIC_LITERAL = /^[+-]?(?:\d+(?:\.\d+)?|\.\d+)(?:e[+-]?\d+)?$/i;
+const NUMERIC_TOKEN = /(?<![\p{L}\p{N}_.+-])[+-]?(?:\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?|\.\d+)(?:e[+-]?\d+)?(?![\p{L}\p{N}_]|\.\d)/giu;
+const MULTIPLICATION_ROW = /^\d+ x \d+ = \d+$/;
+
+function heldOutOutputMatches(expected, output) {
+  if (!expected.length) return true;
+
+  const lines = new Set(output.split(/\r?\n/).map(line => line.trim()));
+  const numbers = output.match(NUMERIC_TOKEN) ?? [];
+  return expected.every(value => {
+    if (MULTIPLICATION_ROW.test(value)) return lines.has(value);
+    if (!NUMERIC_LITERAL.test(value)) return true;
+    return numbers.some(actual => value.includes('.') ? value === actual
+      : Number(value) === Number(actual.replaceAll(',', '')));
+  });
 }
 
 function bindChecks(sample, spec, files, fixtureDir) {
@@ -125,8 +136,8 @@ export async function scoreCandidate({ sample, spec, runDir, commit }) {
     });
     const evidence = report.results.map(({ checkId, status, message, evidence }, index) => {
       const expected = acceptance[index].expectStdoutIncludes ?? [];
-      if (status === 'pass' && !numericOutputMatches(expected, evidence.stdoutTail ?? '')) {
-        return { checkId, status: 'fail', message: 'Expected number did not appear as a complete value.' };
+      if (status === 'pass' && !heldOutOutputMatches(expected, evidence.stdoutTail ?? '')) {
+        return { checkId, status: 'fail', message: 'Expected result did not appear as a complete output line or numeric value.' };
       }
       return { checkId, status, message };
     });
