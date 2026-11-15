@@ -42,3 +42,25 @@ test('file and command failures, timeout, and cancellation are reported', async 
 });
 test('item regression selects earlier items', async t=>{ const ws=await fixture(t); await ws.writeFile('p.txt','yes'); await ws.git.commit('product'); const spec={...base,acceptance:['W1','W2'].map((itemId,i)=>({id:`A${i}`,itemId,type:'file',path:'p.txt',mustContain:['yes']}))}; const o=opts(ws,spec,{commit:await ws.git.head(),acceptanceTree:null}); o.scope={kind:'item',itemId:'W2',includeRegression:true}; const r=await runChecks(o); assert.equal(r.summary.passed,2); assert.equal(r.allPassed,true); });
 
+test('direct command tampering fails every check, restores scaffold, and permits a clean rerun', async t => {
+  const ws = await fixture(t);
+  const generated = { id:'A', itemId:'W1', type:'command', run:['node','acceptance/seed.mjs'], generate:true, expectExitCode:0 };
+  const mutation = { id:'B', itemId:'W1', type:'command', run:['node','mutate.mjs'], generate:false, expectExitCode:0 };
+  const spec = {...base, acceptance:[generated, mutation]};
+  const scaffold = await materializeAcceptance({spec, workspace:ws, llm:async()=>({text:"console.log('PASS A')"})});
+  await ws.writeFile('mutate.mjs', "import fs from 'node:fs'; fs.writeFileSync('acceptance/seed.mjs', 'changed'); console.log('done');");
+  const original = await ws.git.commit('add mutating candidate');
+  const failed = await runChecks(opts(ws, spec, scaffold));
+  assert.equal(failed.candidate, null);
+  assert.equal(failed.acceptanceIntact, false);
+  assert.equal(failed.allPassed, false);
+  assert.deepEqual(failed.results.map(r => [r.status, r.message]), [['fail','acceptance tests were modified'], ['fail','acceptance tests were modified']]);
+  assert.equal(await ws.readFile('acceptance/seed.mjs'), "console.log('PASS A')\n");
+  await ws.writeFile('mutate.mjs', "console.log('done');");
+  const cleanCandidate = await ws.git.commit('remove mutation');
+  assert.notEqual(cleanCandidate, original);
+  const passed = await runChecks(opts(ws, spec, scaffold));
+  assert.equal(passed.candidate, cleanCandidate);
+  assert.equal(passed.acceptanceIntact, true);
+  assert.equal(passed.allPassed, true);
+});

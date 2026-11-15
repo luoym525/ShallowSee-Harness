@@ -157,15 +157,24 @@ export async function runChecks({ spec, workspace, scope, judge, acceptanceTree,
     if (!await intact(workspace, frozen, acceptanceTree)) {
       const results = checks.map(c => result(c, 'fail', 'acceptance tests were modified'));
       await fs.rm(path.join(workspace.dir, 'acceptance'), { recursive: true, force: true });
-      if (acceptanceCommit && acceptanceTree) await workspace.git.restorePath(acceptanceCommit, 'acceptance');
+      if (acceptanceCommit && acceptanceTree) {
+        await workspace.git.restorePath(acceptanceCommit, 'acceptance');
+        await fs.rm(path.join(workspace.dir, 'acceptance'), { recursive: true, force: true });
+        await fs.cp(frozen, path.join(workspace.dir, 'acceptance'), { recursive: true });
+      }
       return report(scope, candidate, results, false, null);
     }
     const results = [];
     for (const c of checks) results.push(await runOne(c, workspace, frozen, judge, signal));
+    if (!await intact(workspace, frozen, acceptanceTree)) {
+      await fs.rm(path.join(workspace.dir, 'acceptance'), { recursive: true, force: true });
+      if (acceptanceCommit && acceptanceTree) {
+        await workspace.git.restorePath(acceptanceCommit, 'acceptance');
+        await fs.rm(path.join(workspace.dir, 'acceptance'), { recursive: true, force: true });
+        await fs.cp(frozen, path.join(workspace.dir, 'acceptance'), { recursive: true });
+      }
+      return report(scope, null, checks.map(c => result(c, 'fail', 'acceptance tests were modified')), false, null);
+    }
     return report(scope, candidate, results, true, results.find(r => r.evidence.judgeModel)?.evidence.judgeModel ?? null);
   } finally { if (frozen) await fs.rm(frozen, { recursive: true, force: true }); }
 }
-
-
-
-
