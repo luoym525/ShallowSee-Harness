@@ -105,7 +105,7 @@ type AcceptanceCheck = { id: string; itemId: string; description: string } & (
 
 Rules the planner's output must satisfy (checked in code by the engine; violations trigger a revision):
 - Every `WorkItem.checkIds` entry exists in `acceptance` and points back with `itemId`.
-- Generated command checks live under `acceptance/` (`run[1]` starts with `acceptance/`).
+- Generated command checks live under `acceptance/` (`run[1]` starts with `acceptance/`). At test time the tester runs them from a frozen read-only copy outside the workspace with cwd = workspace, so generated scripts must import product modules via `pathToFileURL(path.resolve(process.cwd(), "<file>"))`, never by a path relative to the script.
 - Commands use only `node` as `run[0]`; files Node runs use the `.mjs` extension.
 - Ports are in 4400–4499.
 - Everything runs inside the sandbox (interfaces.md "Sandbox boundary"): no reading or writing outside the workspace, no spawning processes. So a CLI is tested with a direct `command` check (`run: ["node","cli.mjs","7"]` + `expectStdoutIncludes`, `generate: false`), a server with an `http` check, and generated scripts only import the product's modules or read its files.
