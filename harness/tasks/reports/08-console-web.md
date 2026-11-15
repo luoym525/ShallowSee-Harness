@@ -24,16 +24,16 @@ node harness/console/web/dev/screenshots.mjs        # regenerate screenshots/
 
 ### `node --test "harness/console/web/**/*.test.mjs"` (real output, summary)
 ```
-# tests 41
+# tests 42
 # suites 0
-# pass 41
+# pass 42
 # fail 0
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 20256.9797
+# duration_ms (about 20 s)
 ```
-The 41 tests:
+The 42 tests:
 ```
 dev/mock-server.test.mjs (13)
   serves the web UI and falls back to index.html for hash-route paths; dev files stay private
@@ -57,7 +57,7 @@ markdown.test.mjs (7)
   fenced code keeps its text verbatim (escaped) and ends at the fence
   emphasis and inline code
   the synthetic REPORT.md fixture renders safely with its sections and table
-model.test.mjs (21)
+model.test.mjs (22)
   the fixture is labelled synthetic and parses cleanly
   whole run: finished state, items, spend, approval, best candidate
   approval badge says Auto-approved by <model>, never approved by you
@@ -79,6 +79,7 @@ model.test.mjs (21)
   formatters and helpers
   fetch-models results map to distinct plain-English outcomes and always keep the configured models
   hasUsableModels and preset order
+  a skipped skill (childRoomId null) pairs started with completed: one entry per invocation, none stuck at running
 ```
 
 ### `node harness/console/web/dev/ui-smoke.mjs` (real output; headless Edge, 52 checks, exit code 0)
@@ -140,9 +141,12 @@ All UI smoke checks passed
 ```
 The smoke test found two real bugs while I built it, both fixed: DELETE sent no `Content-Type: application/json` (the contract requires it on every non-GET, so the real server would have answered 415), and `Element.append(null)` printed the text "null" into the page.
 
+## Review fix (room #368)
+A skipped skill has `childRoomId: null`, so `harness.skill.started` and `harness.skill.completed` could not be paired by room and `planChecks` showed two entries (one stuck at "running"). `model.mjs` now pairs each completed event with the most recent unpaired (still running) started event of the same `skillId` and `phase` when there is no matching `childRoomId`, and an unpaired completed event still yields an entry. Regression test: skipped plan_check (two invocations) and skipped fact_check, an orphan completed event, and a skipped invocation interleaved with a normal one that has a child room.
+
 ## Definition of Done
 - [x] All six screens work against the mock server; English everywhere (click-through above).
-- [x] `node --test "harness/console/web/**/*.test.mjs"` passes (41/41, summary above).
+- [x] `node --test "harness/console/web/**/*.test.mjs"` passes (42/42, summary above).
 - [x] The synthetic fixture is labelled in the UI: **Synthetic replay** chip on the run page, "Synthetic" tag in Runs, a banner on the Report tab; the fixture itself is marked `synthetic: true`.
 - [x] Screenshots in `harness/console/web/screenshots/` (1280×720 unless noted; synthetic data):
   - `01-setup-providers.png` Setup (list) · `02-add-provider.png` Add provider (Anthropic preset picked) and `02b-add-provider-full.png` (full page, shows Models)

@@ -325,3 +325,36 @@ test("hasUsableModels and preset order", () => {
   assert.equal(hasUsableModels({ providers: [{ id: "o", preset: "ollama", kind: "openai_compatible", enabled: true, apiKey: { hasKey: false }, models: [{ id: "x" }] }] }, []), true);
   assert.deepEqual(orderPresets([{ id: "custom" }, { id: "github" }, { id: "anthropic" }, { id: "zzz" }]).map((p) => p.id), ["anthropic", "github", "custom", "zzz"]);
 });
+
+test("a skipped skill (childRoomId null) pairs started with completed: one entry per invocation, none stuck at running", () => {
+  const ev = (seq, type, payload) => ({ seq, type, timestamp: `2026-11-15T02:00:${String(seq).padStart(2, "0")}.000Z`, payload, provenance: { role: "researcher" } });
+  const started = (seq, phase, childRoomId = null) => ev(seq, "harness.skill.started", { skillId: "shelf-life", version: "1.0.0", phase, role: "researcher", docLabel: phase === "plan_check" ? "plan-facts-v1.md" : "README.md", childRoomId });
+  const skipped = (seq, phase, reportPath) => ev(seq, "harness.skill.completed", { skillId: "shelf-life", version: "1.0.0", phase, role: "researcher", childRoomId: null, status: "skipped", reason: "no search provider", findingCount: 0, staleCount: 0, searchesUsed: 0, reportPath });
+  const v = reduceRun([
+    started(1, "plan_check"), skipped(2, "plan_check", "plan-check-v1.json"),
+    started(3, "plan_check"), skipped(4, "plan_check", "plan-check-v2.json"),
+    started(5, "fact_check"), skipped(6, "fact_check", "fact-check.json"),
+  ]);
+  assert.equal(v.planChecks.length, 2, "two plan-check invocations, not four entries");
+  assert.deepEqual(v.planChecks.map((c) => c.status), ["skipped", "skipped"]);
+  assert.deepEqual(v.planChecks.map((c) => c.reportPath), ["plan-check-v1.json", "plan-check-v2.json"]);
+  assert.equal(new Set(v.planChecks.map((c) => c.key)).size, 2, "entries keep distinct keys");
+  assert.equal(v.factChecks.length, 1);
+  assert.equal(v.factCheck.status, "skipped");
+  assert.equal(v.factCheck.reportPath, "fact-check.json");
+  for (const c of [...v.planChecks, v.factCheck]) assert.equal(factCheckSummary(c, null).verified, false);
+  assert.equal([...v.planChecks, ...v.factChecks].some((c) => c.status === "running"), false);
+  // an unpaired completed event still produces an entry instead of being dropped
+  const orphan = reduceRun([skipped(1, "plan_check", "plan-check-v1.json")]);
+  assert.equal(orphan.planChecks.length, 1);
+  assert.equal(orphan.planChecks[0].status, "skipped");
+  // a normal invocation with a child room, interleaved with a skipped one (null room), pairs by room
+  const mixed = reduceRun([
+    started(1, "plan_check", "hr-20261115-000000-aaaa-sl-01"), started(2, "plan_check"),
+    skipped(3, "plan_check", "plan-check-v2.json"),
+    ev(4, "harness.skill.completed", { skillId: "shelf-life", phase: "plan_check", role: "researcher", childRoomId: "hr-20261115-000000-aaaa-sl-01", status: "completed", findingCount: 4, staleCount: 1, searchesUsed: 4, reportPath: "plan-check-v1.json" }),
+  ]);
+  assert.equal(mixed.planChecks.length, 2);
+  assert.deepEqual(mixed.planChecks.map((c) => [c.childRoomId, c.status]), [["hr-20261115-000000-aaaa-sl-01", "completed"], [null, "skipped"]]);
+  assert.equal(mixed.planChecks[0].staleCount, 1);
+});

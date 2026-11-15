@@ -313,6 +313,7 @@ export function createRunView(runId = null) {
     plan: null,
     planVersions: [],
     planChecks: [],
+    factChecks: [],
     factCheck: null,
     shelfLife: { claims: {}, order: [], diff: null },
     reviews: [],
@@ -652,18 +653,23 @@ export function applyEvent(view, env) {
     case "harness.skill.started":
     case "harness.skill.completed": {
       const phase = p.phase === "fact_check" ? "fact_check" : "plan_check";
-      const key = p.childRoomId || `${phase}:${p.reportPath || view.lastSeq}`;
-      let entry;
-      if (phase === "plan_check") {
-        entry = view.planChecks.find((c) => c.key === key);
-        if (!entry) { entry = { key, specVersion: view.plan?.specVersion ?? null }; view.planChecks.push(entry); }
-      } else {
-        entry = view.factCheck && view.factCheck.key === key ? view.factCheck : { key };
-        view.factCheck = entry;
+      const skillId = p.skillId || "shelf-life";
+      const pool = phase === "plan_check" ? view.planChecks : view.factChecks;
+      // Pair started with completed. A skipped skill has childRoomId null, so a completed event without a
+      // matching room pairs with the most recent unpaired (still running) started event of the same skill and phase.
+      let entry = null;
+      if (env.type === "harness.skill.completed") {
+        if (p.childRoomId) entry = pool.find((c) => c.childRoomId === p.childRoomId) || null;
+        if (!entry) for (let i = pool.length - 1; i >= 0; i--) if (pool[i].status === "running" && pool[i].skillId === skillId && (!p.childRoomId || !pool[i].childRoomId)) { entry = pool[i]; break; }
       }
+      if (!entry) {
+        entry = { key: p.childRoomId || `${phase}:${view.lastSeq}`, specVersion: phase === "plan_check" ? view.plan?.specVersion ?? null : null };
+        pool.push(entry);
+      }
+      if (phase === "fact_check") view.factCheck = entry;
       Object.assign(entry, {
         phase,
-        skillId: p.skillId || entry.skillId || "shelf-life",
+        skillId,
         version: p.version || entry.version || null,
         docLabel: p.docLabel || entry.docLabel || null,
         childRoomId: p.childRoomId || entry.childRoomId || null,
