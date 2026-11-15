@@ -370,7 +370,10 @@ interface Skill<I = unknown, O = unknown> {
 interface SkillContext {
   llm: RoleContext["llm"];                           // routed by the engine (role "researcher", purpose "plan_check" | "fact_check")
   search: SearchClient["search"] | null;             // injected only when the skill declares needs.search
-  providerIdentity: { provider: string; model: ModelRef };   // trusted, from the engine's routing; recorded in the skill's events
+  providerIdentity: { provider: string; model: ModelRef };   // trusted, from the engine's routing; recorded in the skill's events.
+                                                     // ctx.llm is PINNED to exactly this model: no provider fallback inside one skill call
+                                                     // (room #292). On a non-retryable failure the engine may rerun the whole skill once with
+                                                     // the next fallback model, in a NEW unique child room with the new providerIdentity.
   childRoom: { rootDir: string; roomId: string; parentRoomId: string };
                                                      // the skill writes its OWN event log here; roomId is UNIQUE per invocation:
                                                      // "<runId>-sl-01", "<runId>-sl-02", ... (event logs cannot be reopened),
