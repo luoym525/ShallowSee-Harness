@@ -205,7 +205,7 @@ export function mountRun(root, runId, { tab = "run", setConnection }) {
         h("span", null, f.summary || ""),
         h("span", { class: "banner-meta" }, [f.minutes !== null ? `${f.minutes.toFixed(1)} min` : null, f.spentUsd !== null ? `${formatUsd(f.spentUsd)}${view.spend.source === "estimated" ? " (estimated)" : ""}` : "cost unknown", `${view.iteration} build attempts`].filter(Boolean).join(" · "))),
       h("div", { class: "banner-actions" },
-        hasProduct ? h("a", { class: "btn primary big", href: previewUrl(runId, f.previewPath || ui.serverState?.previewPath), target: "_blank", rel: "noopener noreferrer", "data-testid": "open-product" }, icon("external", 16), h("span", null, "Open the product")) : null,
+        hasProduct ? h("a", { class: "btn primary big", href: previewUrl(runId), target: "_blank", rel: "noopener noreferrer", "data-testid": "open-product" }, icon("external", 16), h("span", null, "Open the product")) : null,
         h("a", { class: "btn secondary", href: `#/runs/${runId}/report` }, icon("file", 15), h("span", null, "Read the report")),
         h("a", { class: "btn secondary", href: `#/runs/${runId}/files` }, icon("folder", 15), h("span", null, "Browse files")))));
   }
@@ -309,7 +309,7 @@ export function mountRun(root, runId, { tab = "run", setConnection }) {
         h("div", { class: "who-id" }, h("div", { class: "who-role" }, roleLabel(w.role), w.active ? h("span", { class: "live-dot", title: "A model call is running" }) : null), h("div", { class: "who-purpose muted" }, w.purpose ? w.purpose : "")),
       ),
       h("div", { class: "who-model" }, h("span", { class: "model-name", "data-testid": "current-model" }, w.modelName), w.tier ? chip(`Tier ${w.tier}`, "muted") : null, w.pinned ? chip("Pinned by you", "info") : null),
-      esc ? h("div", { class: "escalation", role: "note", "data-testid": "escalation" }, icon("bolt", 15), h("div", null, h("b", null, esc.text), esc.reason ? h("span", null, esc.reason) : null)) : null,
+      esc ? h("div", { class: "escalation", role: "note", "data-testid": "escalation" }, icon("bolt", 15), h("div", null, h("b", null, esc.text))) : null,
       w.reason ? h("blockquote", { class: "why" }, h("span", { class: "why-label" }, "Why this model"), w.reason) : null,
       w.tool ? h("div", { class: "tool-line" }, h("span", { class: "tool-arrow" }, "›"), w.tool) : null,
     );
@@ -352,7 +352,7 @@ export function mountRun(root, runId, { tab = "run", setConnection }) {
         r.verdict === "stale" ? h("div", { class: "shift" }, h("span", { class: "old" }, r.oldValue || r.statement), h("span", { class: "arrow", "aria-hidden": "true" }, "→"), h("span", { class: "new" }, r.proposedValue || "(no correction proposed)")) : null,
         r.forcedRevision ? h("div", { class: "fact-note warn" }, "Stale with a supported correction: this forced a plan revision.") : null,
         h("div", { class: "fact-sources" }, r.sources.length ? r.sources.slice(0, 2).map((s) => sourceLink(s)) : h("span", { class: "muted sm" }, "No source links")),
-        (r.checks.some((c) => c.check === "independent_sources" && !c.passed) ? h("div", { class: "fact-note muted" }, "Only one site stated the value, so this is not treated as confirmed.") : null),
+        (r.checks.some((c) => c.check === "independent_sources" && !c.passed) ? h("div", { class: "fact-note muted" }, "Only one site stated the value, so it stays unsure.") : null),
       ));
     }
     return list;

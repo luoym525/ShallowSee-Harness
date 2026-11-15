@@ -198,11 +198,12 @@ export function createMockServer(opts = {}) {
       if (!p.apiKey.hasKey && p.preset !== "ollama") continue;
       for (const m of p.models) if (m.enabled !== false) models.push({ ref: `${p.id}/${m.id}`, tier: m.tier ?? CATALOG_TIER[m.id] ?? 2 });
     }
-    const pick = (tier, last) => {
-      const byTier = models.filter((m) => m.tier === tier);
-      if (byTier.length) return last ? byTier[0] : byTier[byTier.length - 1];
-      const lower = models.filter((m) => m.tier < tier).sort((a, b) => b.tier - a.tier)[0];
-      return lower || models.sort((a, b) => a.tier - b.tier)[0] || null;
+    const byTier = (tier) => models.filter((x) => x.tier === tier);
+    const pick = (tier) => {
+      const exact = byTier(tier);
+      if (exact.length) return exact[0];
+      const lower = models.filter((x) => x.tier < tier).sort((p, q) => q.tier - p.tier)[0];
+      return lower || [...models].sort((p, q) => p.tier - q.tier)[0] || null;
     };
     return ROLES.map((role) => {
       const pinRef = config.routing.overrides[role];
@@ -212,7 +213,8 @@ export function createMockServer(opts = {}) {
       }
       if (role === "vision") return { role, model: null, tier: null, reason: "No model with vision is configured; image checks are skipped", pinned: false };
       if (!models.length) return { role, model: null, tier: null, reason: "No models yet: add a provider on the Setup page", pinned: false };
-      const m = role === "reviewer" ? models.filter((x) => x.tier === 3)[0] || pick(3) : pick(ROLE_TIER[role], role === "planner");
+      const top = byTier(3);
+      const m = role === "reviewer" ? (top[1] || top[0] || pick(3)) : pick(ROLE_TIER[role]);
       return { role, model: m ? m.ref : null, tier: m ? m.tier : null, reason: ROLE_REASON[role], pinned: false };
     });
   }

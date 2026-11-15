@@ -361,3 +361,31 @@ details.adv { margin-bottom: 18px; } details.adv summary { cursor: pointer; colo
   .sticky-foot > div { padding: 10px 14px; flex-wrap: wrap; } .sticky-foot .hint { flex-basis: 100%; }
   .markdown { padding: 18px 16px; } .metric { min-width: 0; flex: 1 1 40%; } .filelist { columns: 1; }
 }
+
+/* ---- Setup extras */
+.setup-tabs { margin-bottom: 18px; }
+.head-btns { display: flex; gap: 8px; }
+.page-head p.muted { margin-top: 2px; }
+.pbody { min-width: 0; }
+.nokey { color: var(--warn); font-weight: 600; }
+.notice { padding: 10px 14px; border-radius: 10px; margin-bottom: 14px; font-size: 13.5px; background: var(--card-2); border: 1px solid var(--line); }
+.notice.warn { background: var(--warn-bg); color: var(--warn); border-color: transparent; }
+.notice.bad { background: var(--bad-bg); color: var(--bad); border-color: transparent; }
+.inline-row { display: flex; align-items: center; gap: 12px; margin: 10px 0; flex-wrap: wrap; }
+.btn.danger-solid { background: var(--bad); color: #fff; border-color: transparent; }
+.btn.danger-solid:hover:not(:disabled) { background: color-mix(in srgb, var(--bad) 85%, #fff); }
+.linklike { background: none; border: 0; padding: 0; color: var(--info); font-size: 13px; text-decoration: underline; text-underline-offset: 3px; }
+.warn-text { color: var(--warn) !important; }
+.add-model { display: flex; gap: 8px; margin-top: 12px; }
+.add-model input { flex: 1; height: 36px; border-radius: 9px; border: 1px solid var(--line-2); background: var(--input); padding: 0 12px; }
+.mrows .mrow:first-child { border-top: 0; }
+.models-section .inline { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 8px; }
+.models-section .label { font-weight: 650; }
+.sm-name { font-size: 15px; }
+.why-cell { max-width: 38ch; font-size: 13px; }
+.mrow button.btn { min-width: 36px; padding: 0 8px; }
+.field input[aria-invalid="true"] { border-color: var(--bad); }
+.pcard .test-result { margin-top: 0; }
+
+.field .inline label { font-size: 13px; font-weight: 650; }
+.routing-table td:nth-child(2), .routing-table td:nth-child(3) { white-space: nowrap; }
