@@ -34,10 +34,18 @@ Server: `harness/console/server/` (workstream 07). Client: `harness/console/web/
 | `GET /api/runs/:runId/artifacts/:name` | `name` ∈ `wish.txt, brief.json, research.json, spec.json, plan-review.json, progress.md, final-review.json, REPORT.md, tests/<file>, reflections/<file>` | the file (`application/json` or `text/markdown`/`text/plain`) |
 | `GET /api/runs/:runId/files` | — | `{ files: string[] }` workspace files (relative paths) |
 | `GET /api/runs/:runId/files/<path>` | — | text content, max 500 KB; `415` for binary |
-| `GET /preview/:runId/<path>` | — | serves workspace files with the right content type so a `static-web` product opens in the browser (`/preview/<runId>/` → `spec.entry.path`). Read-only, path-checked, same security rules. |
+| *(preview, separate origin)* `GET http://127.0.0.1:4321/<runId>/<path>` | — | see "Product preview" below |
 | `POST /api/runs/:runId/cancel` | `{}` | `{ ok: true }` |
 | `POST /api/runs/:runId/confirm` | `{}` | `{ ok: boolean }` (only in `confirm_plan` mode) |
 
+## Product preview (separate origin)
+
+Generated products are untrusted code. They must never share an origin with the control API, or their JavaScript could read the config, start runs or confirm plans. So the console server opens a **second listener on `127.0.0.1:4321`** that serves only static files:
+- `GET /<runId>/` → the run's `spec.entry.path`; `GET /<runId>/<path>` → that workspace file. GET and HEAD only; no `/api`, no directory listings, no `.git`, path-checked, symlinks refused.
+- Host must be `127.0.0.1:4321` or `localhost:4321`. Headers: `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`, `Content-Security-Policy: frame-ancestors 'none'`.
+- The control API on 4320 already rejects any non-GET request without `Content-Type: application/json` or with a foreign `Origin` (so a 4321 page's cross-origin POST is refused, and the JSON content type forces a CORS preflight that the API never approves), and it sends no CORS headers, so a 4321 page can't read 4320 responses.
+- The UI's **Open the product** button links to `http://127.0.0.1:4321/<runId>/` in a new tab.
+
 ## Static UI
 
-`GET /` and any path not starting with `/api/` or `/preview/` → files from `harness/console/web/` (`index.html` for unknown paths so hash routes work).
+`GET /` and any path not starting with `/api/` → files from `harness/console/web/` (`index.html` for unknown paths so hash routes work).

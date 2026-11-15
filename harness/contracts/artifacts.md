@@ -67,7 +67,7 @@ interface Spec {
   specVersion: number;                  // 1, then +1 per replan
   title: string;
   summary: string;                      // what and why, 3–6 sentences, no low-level how
-  stack: "static-web" | "node" | "python";
+  stack: "static-web" | "node";         // python is out of scope this sprint (no OS sandbox for it here)
   entry: { kind: "open_html"; path: string }                               // static-web, e.g. "index.html"
        | { kind: "command"; run: string[] }                                // e.g. ["node","cli.mjs","--help"]
        | { kind: "server"; run: string[]; port: number; path: string };    // e.g. ["node","server.mjs"], 4401, "/"
@@ -84,6 +84,8 @@ interface WorkItem {
   title: string;
   description: string;                  // what the user gets when this is done
   difficulty: "easy" | "medium" | "hard";   // drives model routing
+  suggestedModel: ModelRef | null;      // planner's choice of builder model, from the roster it was given; router validates
+  modelReason: string | null;           // one line, shown in the UI ("Simple HTML; the cheapest coder is enough")
   dependsOn: string[];
   files: string[];                      // expected files to create or change (guidance, not a whitelist)
   checkIds: string[];
@@ -103,8 +105,9 @@ type AcceptanceCheck = { id: string; itemId: string; description: string } & (
 Rules the planner's output must satisfy (checked in code by the engine; violations trigger a revision):
 - Every `WorkItem.checkIds` entry exists in `acceptance` and points back with `itemId`.
 - Generated command checks live under `acceptance/` (`run[1]` starts with `acceptance/`).
-- Commands use only `node` or `python` as `run[0]`.
+- Commands use only `node` as `run[0]`; files Node runs use the `.mjs` extension.
 - Ports are in 4400–4499.
+- Everything runs inside the sandbox (interfaces.md "Sandbox boundary"): no reading or writing outside the workspace, no spawning processes. So a CLI is tested with a direct `command` check (`run: ["node","cli.mjs","7"]` + `expectStdoutIncludes`, `generate: false`), a server with an `http` check, and generated scripts only import the product's modules or read its files.
 
 ## `plan-review.json` — PlanReview (reviewer)
 
@@ -141,12 +144,13 @@ interface TestReport {
     durationMs: number;
   }[];
   summary: { total: number; passed: number; failed: number; errored: number; skipped: number };
-  score: number;                        // passed / (total - skipped), 0 when nothing ran
+  score: number;                        // passed / (total - skipped), exact (not rounded; round only for display), 0 when nothing ran
   acceptanceIntact: boolean;            // tree hash of acceptance/ matches the scaffold
+  allPassed: boolean;                   // total > 0 && passed === total && acceptanceIntact (no fail, error or skipped). The ONLY basis for "delivered".
   testerModel: ModelRef | null;
 }
 ```
-Meta-checks (tester code): a `pass` needs evidence (exit code and output for command, status for http, a verbatim quote found in the named file for llm_judge); without it the result becomes `fail` with message `"unsupported pass"`. If `acceptanceIntact` is false, every result is `fail`.
+Meta-checks (tester code): a `pass` needs evidence (exit code and output for command, status for http, a verbatim quote found in the named file for llm_judge); without it the result becomes `fail` with message `"unsupported pass"`. If `acceptanceIntact` is false, every result is `fail` (message "acceptance tests were modified"), and after writing the report the tester restores `acceptance/` from the scaffold commit (`git.restorePath`) so the next attempt runs the frozen tests.
 
 ## `reflections/NNN.json` — Reflection (reflector)
 

@@ -42,7 +42,7 @@ Consumers ignore event types and fields they don't know (CONTRACT rule 5). Unkno
 | `harness.candidate.best` | `commit`, `score`, `previousBest: number \| null`, `reverted: boolean` (true when the engine reset to the best commit) |
 | `harness.budget.updated` | `spentUsd`, `usdSource`, `elapsedMinutes`, `iterations`, `limits`, `exceeded: null \| "usd" \| "minutes" \| "iterations"` |
 | `harness.final.reviewed` | `verdict`, `scores`, `gaps`, `reviewerModel` |
-| `harness.run.finished` | `status: RunStatus`, `summary`, `finalScore`, `reportPath`, `previewPath`, `spentUsd`, `minutes` |
+| `harness.run.finished` | `status: RunStatus`, `summary`, `finalScore`, `allPassed`, `candidate` (final commit), `specVersion`, `reportPath`, `previewPath`, `spentUsd`, `minutes` |
 
 ## Typical order (abridged)
 

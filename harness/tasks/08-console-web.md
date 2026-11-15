@@ -43,7 +43,7 @@ HTTP + SSE from the console server (brief 07). Until it exists, run your own tin
 - **Timeline**: a compact event feed with human sentences (from `model.mjs`), expandable details (test evidence, reflections, sources with links).
 - **Plan approval** badge: "Auto-approved by <model>" (never "approved by you" unless `by: "user"`); in confirm mode, a **Confirm plan** button.
 - **Sources** panel (research): domain chips linking to sources.
-- When finished: **Open the product** (`/preview/<runId>/`) for static-web, the rendered REPORT.md (write a tiny safe Markdown renderer: headings, lists, tables, code, links; escape all HTML), and a file browser.
+- When finished: **Open the product** (a new tab at `http://127.0.0.1:4321/<runId>/`, the separate preview origin; never embed it in the console page) for static-web, the rendered REPORT.md (write a tiny safe Markdown renderer: headings, lists, tables, code, links; escape all HTML), and a file browser.
 
 **6. Runs** (`#/runs`): history list with status, title, score and date.
 

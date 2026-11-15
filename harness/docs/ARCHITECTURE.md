@@ -115,11 +115,10 @@ Formats: [../contracts/artifacts.md](../contracts/artifacts.md). Events: [../con
 
 To keep testing real and fast, the planner must choose one stack:
 - `static-web`: HTML, CSS and JavaScript files opened in a browser and served by the console's preview route.
-- `node`: Node.js 20+ scripts or a small HTTP server, built-in modules only.
-- `python`: Python 3.11 standard library only.
+- `node`: Node.js 20+ scripts (`.mjs`) or a small HTTP server, built-in modules only.
 
-No package installs. External web APIs are allowed in the product when they need no key (the research step finds them). This rules out some wishes, and the intake step says so in its assumptions rather than failing silently.
+Python is out of scope this sprint: Node's permission model gives model-run code a real file-system boundary (workspace only, no child processes), and there is no equivalent for Python here. See the "Sandbox boundary" table in [../contracts/interfaces.md](../contracts/interfaces.md) for exactly what is and is not guaranteed. No package installs. External web APIs are allowed in the product when they need no key (the research step finds them). This rules out some wishes, and the intake step says so in its assumptions rather than failing silently.
 
 ## 5. Model selection in one paragraph
 
-The router reads the configured models (from `apiConfig.json`) and a built-in catalog of tiers, capabilities and prices. For each call the engine asks `selectModel({ role, difficulty, attempt, needs, avoid })`. The policy encodes Bill's mapping (strong models plan and review, cheap models code, an independent model tests, a vision-capable model looks at images), escalates one tier after each failed attempt, keeps the tester off the builder's model, and prefers the cheapest model that satisfies the tier. Users can pin a model per role in the Setup page; a pin wins unless it lacks a required capability. Every choice is logged with a one-line reason the UI shows.
+The router reads the configured models (from `apiConfig.json`) and a built-in catalog of tiers, capabilities and prices. The planner runs on the **strongest** model provided, sees the list of configured models, and for each work item suggests which model should build it and why (team decision, room #247). That suggestion is advice: the router accepts it only if the model exists, has the needed capabilities, isn't excluded and fits the budget. For each call the engine asks `selectModel({ role, difficulty, attempt, needs, avoid, suggested })`. The policy encodes Bill's mapping (strong models plan and review, cheap models code, an independent model tests, a vision-capable model looks at images), escalates one tier after each failed attempt, keeps the tester off the builder's model, and prefers the cheapest model that satisfies the tier. Users can pin a model per role in the Setup page; a pin wins unless it lacks a required capability. Every choice is logged with a one-line reason the UI shows.

@@ -121,6 +121,7 @@ interface CatalogEntry { match: string;            // exact model id, or a regex
                          tier: 1|2|3; capabilities: Capability[]; inputUsdPerMTok: number | null; outputUsdPerMTok: number | null }
 export const DEFAULT_POLICY: Record<RoleName, RolePolicy>;
 interface RolePolicy { baseTier: 1|2|3; hardBaseTier?: 1|2|3; requires: Capability[]; prefer: Capability[];
+                       pick: "cheapest" | "strongest";   // tie-break inside a tier; planner and reviewer use "strongest" (the best model provided)
                        escalation: "per_attempt" | "after_two" | "none" }
 
 export function buildRoster(config: ApiConfig, opts?: { catalog?: CatalogEntry[] }): RosterModel[];
@@ -137,9 +138,13 @@ interface RouteRequest {
   avoidModels?: ModelRef[];                    // e.g. tester avoids the builder's model
   avoidVendors?: string[];                     // soft: used when preferVendorDiversity
   budgetRemainingUsd?: number | null;          // when low, prefer cheaper within the allowed tier range
+  suggested?: ModelRef | null;                 // the planner's choice for this work item (builder only). Used on attempt 1 when it is
+                                               // in the roster, has every required capability and is not avoided; escalation on later
+                                               // attempts starts from its tier. Invalid → ignored, and the reason says why.
 }
 interface RouteDecision {
-  model: ModelRef; tier: 1|2|3; rule: string;  // rule id, e.g. "builder.escalate.attempt2"
+  model: ModelRef; tier: 1|2|3; rule: string;  // rule id, e.g. "builder.escalate.attempt2", "builder.planner_suggested"
+  suggested: boolean;                          // true when the planner's suggestion was used
   reason: string;                              // one plain-English line for the UI, e.g. "Attempt 2 failed tests, escalated coder from tier 1 to tier 2 (claude-sonnet-5-5)"
   escalated: boolean; pinned: boolean;
   fallbacks: ModelRef[];                       // next choices if the call fails with a non-retryable provider error
@@ -161,7 +166,10 @@ Every role has the same call shape and returns one artifact that has already pas
 ```ts
 export const intake:     Role<{ wish: string }, Brief>;
 export const researcher: Role<{ brief: Brief }, Research>;
-export const planner:    Role<{ brief: Brief; research: Research; revision?: { previous: Spec; review: PlanReview } | { previous: Spec; replanReason: string } }, Spec>;
+export const planner:    Role<{ brief: Brief; research: Research; roster: RosterSummary[];
+                                revision?: { previous: Spec; review: PlanReview } | { previous: Spec; replanReason: string } }, Spec>;
+  // RosterSummary = { ref, label, tier, capabilities, inputUsdPerMTok, outputUsdPerMTok }: the models actually configured.
+  // The planner picks WorkItem.suggestedModel only from this list; the router validates it in code.
 export const reviewer: {
   reviewPlan:  Role<{ brief: Brief; research: Research; spec: Spec }, PlanReview>;
   reviewFinal: Role<{ brief: Brief; spec: Spec; testReport: TestReport; fileList: string[]; readmeExcerpt: string | null }, FinalReview>;
@@ -200,11 +208,14 @@ interface Workspace {
   writeFile(rel: string, content: string): Promise<{ bytes: number }>;          // creates folders; max 1 MB
   editFile(rel: string, oldText: string, newText: string): Promise<void>;       // oldText must occur exactly once
   listFiles(opts?: { maxEntries?: number }): Promise<string[]>;                 // relative POSIX paths; skips .git and node_modules
-  exec(cmd: "node" | "python", args: string[], opts?: { timeoutMs?: number; input?: string; env?: Record<string,string> }):
-    Promise<{ exitCode: number | null; stdout: string; stderr: string; timedOut: boolean; durationMs: number }>;
-    // no shell; cwd = workspace; scrubbed env (no keys); output truncated to the last 20 KB each; default timeout 60 s
-  startProcess(cmd: "node" | "python", args: string[], opts: { port: number; readyPath?: string; timeoutMs?: number }):
-    Promise<{ url: string; stop(): Promise<void> }>;        // waits until http://127.0.0.1:<port><readyPath> answers
+  exec(cmd: "node", args: string[], opts?: { timeoutMs?: number; input?: string; env?: Record<string,string>; signal?: AbortSignal }):
+    Promise<{ exitCode: number | null; stdout: string; stderr: string; timedOut: boolean; cancelled: boolean; durationMs: number }>;
+    // no shell; cwd = workspace; scrubbed env (no keys); output truncated to the last 20 KB each; default timeout 60 s.
+    // OS boundary: always runs `node --permission --allow-fs-read=<ws> --allow-fs-write=<ws> ...` (see "Sandbox boundary" below).
+    // Settles ONLY after the whole process tree has exited, including on timeout and abort.
+  startProcess(cmd: "node", args: string[], opts: { port: number; readyPath?: string; timeoutMs?: number; signal?: AbortSignal }):
+    Promise<{ url: string; stop(): Promise<void> }>;        // same permission flags; waits until http://127.0.0.1:<port><readyPath> answers;
+                                                            // stop() and abort resolve only after the process tree has exited
   git: {
     commit(message: string): Promise<string | null>;        // stages everything; returns new sha or null when nothing changed
     head(): Promise<string | null>;
@@ -212,15 +223,34 @@ interface Workspace {
     tag(name: string, sha?: string): Promise<void>;
     changedFiles(fromSha: string, toSha?: string): Promise<string[]>;
     treeHash(path: string): Promise<string | null>;         // git hash of a subtree, used for the acceptance tamper check
+    restorePath(sha: string, path: string): Promise<void>;  // `git checkout <sha> -- <path>` then commit "restore <path>"; used to undo tampering
   };
 }
 
 export const SANDBOX_TOOLS: ToolSpec[];   // read_file, write_file, edit_file, list_files, run_command
-export async function executeTool(ws: Workspace, name: string, input: object, opts?: { readOnly?: boolean; denyPaths?: string[] }): Promise<string>;
+export async function executeTool(ws: Workspace, name: string, input: object, opts?: { readOnly?: boolean; denyPaths?: string[]; signal?: AbortSignal }): Promise<string>;
   // The ONLY way models touch the workspace. Returns a short text result (errors as "ERROR <code>: <message>", never throws for tool misuse).
-  // readOnly: write_file/edit_file refused. denyPaths: prefixes the caller may not write (builder: ["acceptance/"]).
-export class SandboxError extends Error { code: "path_escape" | "too_large" | "not_found" | "not_unique" | "command_not_allowed" | "timeout" | "git_failed" }
+  // readOnly / denyPaths are TOOL-LEVEL guards on write_file and edit_file only (builder: denyPaths ["acceptance/"]).
+  // They are not an OS boundary: code run through run_command can still write anywhere inside the workspace. See below.
+  // Resolves only after any process it started has exited.
+export async function sandboxSupport(): Promise<{ ok: boolean; flag: "--permission" | "--experimental-permission" | null; detail: string }>;
+  // Probes the local Node once (cached). The engine refuses to start a run when ok is false (fail closed).
+export class SandboxError extends Error { code: "path_escape" | "too_large" | "not_found" | "not_unique" | "command_not_allowed" | "timeout" | "cancelled" | "git_failed" | "sandbox_unavailable" }
 ```
+
+### Sandbox boundary (what is and is not guaranteed)
+
+| Threat | Guarantee | Mechanism |
+|---|---|---|
+| Model-run code reads keys (`apiConfig.json`, `.env`) or other files outside the workspace | **Blocked by the OS-level Node permission model** | Every child is `node --permission --allow-fs-read=<real workspace path> --allow-fs-write=<real workspace path>`; verified on this machine (Node 22.23.1, Windows): reads and writes outside return `ERR_ACCESS_DENIED` |
+| Keys in environment variables | Blocked | scrubbed environment (allow-list only) |
+| Model-run code spawns an unsandboxed process or worker | Blocked | no `--allow-child-process`, no `--allow-worker` |
+| Model-run code edits `acceptance/` (inside the workspace) | **Not prevented; detected and undone** | tester compares the `acceptance/` tree hash before every run; on mismatch every result fails and the tester restores the frozen tests from the scaffold commit |
+| Network access | **Not restricted** (products may call key-less public APIs) | documented limitation |
+| CPU and memory | Bounded only by timeouts | documented limitation |
+| Python | **Not supported this sprint** (no equivalent OS boundary here) | `cmd` must be `node`; `python` returns `command_not_allowed` |
+
+Cancellation: every call that starts a process accepts `signal`. On abort the sandbox kills the process tree (Windows: `taskkill /pid <pid> /T /F`; POSIX: kill the process group) and resolves with `cancelled: true` **only after the processes have exited**. Callers (builder, tester, engine) must await these settlements before any `git` operation, `resetHard`, writing a terminal run status or closing the event log.
 
 ## 5. `harness/workers/builder/index.mjs` (workstream 04)
 
@@ -252,6 +282,7 @@ interface BuildResult {
 export async function materializeAcceptance(opts: { spec: Spec; workspace: Workspace; llm: RoleContext["llm"]; signal: AbortSignal }):
   Promise<{ files: string[]; commit: string | null; acceptanceTree: string | null }>;
   // Writes workspace/acceptance/** test scripts for every check with type "command" and generate:true, commits "scaffold: acceptance tests".
+  // The returned commit is the scaffold commit used to restore acceptance/ after tampering.
 
 export async function runChecks(opts: {
   spec: Spec; workspace: Workspace;
@@ -259,7 +290,8 @@ export async function runChecks(opts: {
   judge: RoleContext["llm"] | null;         // routed tester model, never the builder's; null → llm_judge checks are "skipped"
   vision?: RoleContext["llm"] | null;       // optional, for "visual" checks
   acceptanceTree: string | null;            // expected tree hash from materializeAcceptance; mismatch → tamper failure
-  signal: AbortSignal;
+  acceptanceCommit: string | null;          // scaffold commit; on tamper the tester restores acceptance/ from it after reporting
+  signal: AbortSignal;                      // passed to every exec/startProcess; resolves only after all started processes exited
 }): Promise<TestReport>;
 ```
 
@@ -279,7 +311,7 @@ export function startRun(opts: {
 interface RunHandle {
   runId: string;                            // "hr-20261115-013012-a1b2"
   done: Promise<RunSummary>;
-  cancel(reason?: string): void;
+  cancel(reason?: string): void;            // aborts; `done` resolves "cancelled" only after every in-flight model call, tool and process has settled
   confirmPlan(): boolean;                   // only meaningful in confirm_plan mode while awaiting_confirmation
 }
 interface RunSummary { runId: string; status: RunStatus; finalScore: number | null; spentUsd: number | null; minutes: number;
@@ -311,12 +343,12 @@ CLI (`harness/bin/shallowsee.mjs`): `run "<wish>" [--budget-usd N] [--minutes N]
 ## 8. `harness/console/server/index.mjs` (workstream 07)
 
 ```ts
-export function createConsoleServer(opts?: { port?: number; host?: "127.0.0.1"; configPath?: string; dataDir?: string;
+export function createConsoleServer(opts?: { port?: number; previewPort?: number; host?: "127.0.0.1"; configPath?: string; dataDir?: string;
                                              webDir?: string; engine?: typeof import("../../engine/index.mjs") }):
-  { listen(): Promise<{ url: string }>; close(): Promise<void> };
+  { listen(): Promise<{ url: string; previewUrl: string }>; close(): Promise<void> };
 ```
 
-Run with `node harness/console/server/index.mjs` → `http://127.0.0.1:4320`. Endpoints: [http-api.md](http-api.md).
+Run with `node harness/console/server/index.mjs` → control UI and API on `http://127.0.0.1:4320`, product preview on the separate origin `http://127.0.0.1:4321`. Endpoints: [http-api.md](http-api.md).
 
 ## 9. `harness/console/web/` (workstream 08)
 
