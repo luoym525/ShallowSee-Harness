@@ -1,0 +1,14 @@
+{
+  "verdict": "ship",
+  "scores": {
+    "meetsWish": 3,
+    "works": 3,
+    "quality": 2
+  },
+  "gaps": [
+    "If the visitor blocks location access, they have to type a city.",
+    "Only tomorrow's maximum chance of rain is shown, not an hourly breakdown."
+  ],
+  "iterateItems": [],
+  "reviewerModel": "anthropic/claude-opus-5-5"
+}

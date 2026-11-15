@@ -1,0 +1,207 @@
+{
+  "specVersion": 2,
+  "title": "Umbrella Check",
+  "summary": "A single static page that answers one question: do I need an umbrella tomorrow? It asks the browser for the visitor's location (or takes a city name), fetches tomorrow's forecast from Open-Meteo without any key, and shows a big yes or no with the chance of rain, the expected rainfall and the rule it used.",
+  "stack": "static-web",
+  "entry": {
+    "kind": "open_html",
+    "path": "index.html"
+  },
+  "architecture": "index.html loads app.js (page logic). app.js imports forecast.mjs, a pure module that builds the request URLs, reads tomorrow's values and decides the verdict. styles.css holds the layout. README.md explains how to use it.",
+  "assumptions": [
+    "Location: Ask the browser for the location; if that is refused, let the visitor type a city",
+    "When to take an umbrella: Yes when tomorrow's chance of rain is 40% or more, or at least 1 mm of rain is expected",
+    "Units: Millimetres and percent"
+  ],
+  "outOfScope": [
+    "Hourly breakdown",
+    "Notifications",
+    "Saving several places"
+  ],
+  "sources": [
+    {
+      "name": "Weather Forecast API | Open-Meteo",
+      "url": "https://open-meteo.com/en/docs",
+      "domain": "open-meteo.com",
+      "snippet": "Daily variables include precipitation_probability_max and precipitation_sum; forecast_days sets how many days are returned.",
+      "retrievedAt": "2026-11-15T01:31:02.000Z"
+    },
+    {
+      "name": "Geocoding API | Open-Meteo",
+      "url": "https://open-meteo.com/en/docs/geocoding-api",
+      "domain": "open-meteo.com",
+      "snippet": "Search a place by name and get its latitude and longitude.",
+      "retrievedAt": "2026-11-15T01:31:09.000Z"
+    },
+    {
+      "name": "Terms | Open-Meteo",
+      "url": "https://open-meteo.com/en/terms",
+      "domain": "open-meteo.com",
+      "snippet": "Free for non-commercial use; no API key needed.",
+      "retrievedAt": "2026-11-15T01:31:14.000Z"
+    },
+    {
+      "name": "Geolocation API | MDN",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/API/Geolocation_API",
+      "domain": "developer.mozilla.org",
+      "snippet": "Available only in secure contexts; the browser asks the visitor for permission.",
+      "retrievedAt": "2026-11-15T01:31:20.000Z"
+    },
+    {
+      "name": "open-meteo/open-meteo on GitHub",
+      "url": "https://github.com/open-meteo/open-meteo",
+      "domain": "github.com",
+      "snippet": "Open-source weather API with forecasts of up to 16 days.",
+      "retrievedAt": "2026-11-15T01:33:40.000Z"
+    },
+    {
+      "name": "Geolocation | W3C",
+      "url": "https://www.w3.org/TR/geolocation/",
+      "domain": "w3.org",
+      "snippet": "The API is restricted to secure contexts.",
+      "retrievedAt": "2026-11-15T01:33:44.000Z"
+    }
+  ],
+  "workItems": [
+    {
+      "id": "W1",
+      "title": "Page layout and city search",
+      "description": "A clean page with a big answer area, a 'Use my location' button and a city search box.",
+      "difficulty": "easy",
+      "suggestedModel": "anthropic/claude-haiku-5-5",
+      "modelReason": "Simple HTML and CSS; the cheapest coder is enough",
+      "dependsOn": [],
+      "files": [
+        "index.html",
+        "styles.css",
+        "app.js"
+      ],
+      "checkIds": [
+        "A1",
+        "A2"
+      ]
+    },
+    {
+      "id": "W2",
+      "title": "Tomorrow's forecast and the umbrella verdict",
+      "description": "Fetches tomorrow's chance of rain and rainfall and turns them into a clear yes or no.",
+      "difficulty": "medium",
+      "suggestedModel": "anthropic/claude-haiku-5-5",
+      "modelReason": "A small pure module with clear tests; try the cheapest coder first",
+      "dependsOn": [
+        "W1"
+      ],
+      "files": [
+        "forecast.mjs",
+        "app.js"
+      ],
+      "checkIds": [
+        "A3",
+        "A4",
+        "A5"
+      ]
+    },
+    {
+      "id": "W3",
+      "title": "Friendly errors and a README",
+      "description": "Plain-word messages when location or the forecast fails, and a short README.",
+      "difficulty": "easy",
+      "suggestedModel": "anthropic/claude-haiku-5-5",
+      "modelReason": "Short text changes; the cheapest coder is enough",
+      "dependsOn": [
+        "W2"
+      ],
+      "files": [
+        "app.js",
+        "README.md"
+      ],
+      "checkIds": [
+        "A6",
+        "A7"
+      ]
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "A1",
+      "itemId": "W1",
+      "description": "index.html has the title and a city input",
+      "type": "file",
+      "path": "index.html",
+      "mustContain": [
+        "Umbrella Check",
+        "<input"
+      ]
+    },
+    {
+      "id": "A2",
+      "itemId": "W1",
+      "description": "The page has a search form and a result area",
+      "type": "command",
+      "run": [
+        "node",
+        "acceptance/a2-layout.test.mjs"
+      ],
+      "expectExitCode": 0,
+      "generate": true
+    },
+    {
+      "id": "A3",
+      "itemId": "W2",
+      "description": "The forecast request asks for tomorrow's daily rain values with timezone=auto",
+      "type": "command",
+      "run": [
+        "node",
+        "acceptance/a3-forecast-url.test.mjs"
+      ],
+      "expectExitCode": 0,
+      "generate": true
+    },
+    {
+      "id": "A4",
+      "itemId": "W2",
+      "description": "60% chance of rain gives 'Take an umbrella'; 10% and 0 mm gives 'No umbrella needed'",
+      "type": "command",
+      "run": [
+        "node",
+        "acceptance/a4-verdict.test.mjs"
+      ],
+      "expectExitCode": 0,
+      "generate": true
+    },
+    {
+      "id": "A5",
+      "itemId": "W2",
+      "description": "The verdict is clear to a non-technical reader and shows the rule used",
+      "type": "llm_judge",
+      "rubric": "Plain words; shows chance of rain, expected rainfall and the 40% / 1 mm rule",
+      "files": [
+        "app.js",
+        "forecast.mjs"
+      ]
+    },
+    {
+      "id": "A6",
+      "itemId": "W3",
+      "description": "When the forecast can't be loaded, the message says so in plain words",
+      "type": "command",
+      "run": [
+        "node",
+        "acceptance/a6-errors.test.mjs"
+      ],
+      "expectExitCode": 0,
+      "generate": true
+    },
+    {
+      "id": "A7",
+      "itemId": "W3",
+      "description": "README explains how to use the page and names the data source",
+      "type": "file",
+      "path": "README.md",
+      "mustContain": [
+        "How to use",
+        "Open-Meteo"
+      ]
+    }
+  ]
+}

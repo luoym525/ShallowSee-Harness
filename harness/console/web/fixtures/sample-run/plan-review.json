@@ -1,0 +1,20 @@
+{
+  "verdict": "approve",
+  "scores": {
+    "coversWish": 3,
+    "feasible": 3,
+    "testable": 3,
+    "scoped": 3
+  },
+  "issues": [
+    {
+      "severity": "minor",
+      "text": "Consider remembering the last city; not required."
+    }
+  ],
+  "requiredChanges": [],
+  "reviewerModel": "anthropic/claude-opus-5-5",
+  "reviewerCallId": "call-0008",
+  "specVersion": 2,
+  "specSha256": "1dcb052e5f039da794e8892760040de55cc85dd347fd8faae4e6855c8b105343"
+}
