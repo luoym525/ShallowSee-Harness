@@ -222,6 +222,28 @@ test('confirm_plan: the run waits in awaiting_confirmation, records the user\'s 
   assert.equal(events[0].payload.autonomy, 'confirm_plan');
 });
 
+test('confirm_plan: the waiting event can be confirmed immediately and only once', async t => {
+  const kit = await makeKit({ builder: ok });
+  t.after(kit.cleanup);
+  let responses;
+  let actionsBeforeConfirmation;
+  const handle = startRun({
+    wish: WISH, config: kit.config, dataDir: kit.dataDir, deps: kit.deps, overrides: { autonomy: 'confirm_plan' },
+    onEvent(event) {
+      if (event.type !== 'harness.phase.changed' || event.payload.phase !== 'awaiting_confirmation') return;
+      actionsBeforeConfirmation = kit.seen.builderCalls.length;
+      responses = [handle.confirmPlan(), handle.confirmPlan()];
+      if (!responses[0]) handle.cancel('The immediate confirmation was missed.');
+    },
+  });
+  const summary = await handle.done;
+  assert.equal(actionsBeforeConfirmation, 0);
+  assert.deepEqual(responses, [true, false]);
+  assert.equal(summary.status, 'delivered');
+  const events = await readLog(kit.dataDir, handle.runId);
+  assert.equal(ofType(events, 'harness.plan.confirmed').length, 1);
+});
+
 test('confirm_plan: cancelling while waiting ends the run as cancelled', async t => {
   const waiting = deferred();
   const kit = await makeKit({ builder: ok });
