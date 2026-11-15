@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { appendFile, mkdir, mkdtemp, readFile, rm, rmdir, symlink, writeFile } from 'node:fs/promises';
+import { once } from 'node:events';
 import { request } from 'node:http';
+import { connect } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -422,6 +424,19 @@ test('close ends streams while an unfinished run is open', async t => {
   assert.match(Buffer.from((await reader.read()).value).toString(), /room.created/);
   await app.close();
   assert.equal((await reader.read()).done, true);
+});
+
+test('HTTP close has a deadline even if a preview socket never sends a request', { timeout: 4000 }, async t => {
+  const { app, previewUrl } = await fixture(t);
+  const socket = connect(Number(new URL(previewUrl).port), '127.0.0.1');
+  try {
+    await once(socket, 'connect');
+    const socketClosed = once(socket, 'close');
+    await app.close();
+    await socketClosed;
+  } finally {
+    socket.destroy();
+  }
 });
 
 test('without the UI files a placeholder and JSON health remain available', async t => {

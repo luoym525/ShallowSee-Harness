@@ -52,7 +52,10 @@ function start(server, port) {
 
 function stop(server) {
   return new Promise((resolveClose, reject) => {
+    // An idle speculative socket may never send a request for Node to mark as idle.
+    const deadline = setTimeout(() => server.closeAllConnections(), 1000).unref();
     server.close(error => {
+      clearTimeout(deadline);
       if (!error || error.code === 'ERR_SERVER_NOT_RUNNING') resolveClose();
       else reject(error);
     });
