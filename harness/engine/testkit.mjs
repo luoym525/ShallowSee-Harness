@@ -62,7 +62,7 @@ export function fakeRouter(calls = []) {
 }
 
 /** Real git in a temp folder: a Workspace-shaped object. `guard` records git calls made while a worker is pending. */
-export async function fakeWorkspace({ dir }, guard) {
+export async function fakeWorkspace({ dir }, guard, options = {}) {
   const git = (...args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }).trim();
   await mkdir(dir, { recursive: true });
   git('init', '-q');
@@ -95,7 +95,11 @@ export async function fakeWorkspace({ dir }, guard) {
       async commit(message) { note('commit'); git('add', '-A'); if (!git('status', '--porcelain')) return null; git('commit', '-q', '-m', message); return head(); },
       async head() { return head(); },
       async resetHard(sha) { note('resetHard'); git('reset', '--hard', '-q', sha); git('clean', '-fdq'); },
-      async tag() {}, async changedFiles() { return []; }, async treeHash() { return 'tree'; }, async restorePath() {},
+      async tag() {}, async treeHash() { return 'tree'; }, async restorePath() {},
+      // changedFiles(from): tracked changes between `from` and the working tree (like `git diff --name-only from`).
+      async changedFiles(from) { return git('diff', '--name-only', from).split(/\r?\n/).filter(Boolean); },
+      // status(): `git status --porcelain` lines (tracked and untracked). Not in the Workspace contract; the engine uses it when present.
+      ...(options.noStatus ? {} : { async status() { return git('status', '--porcelain').split(/\r?\n/).filter(Boolean); } }),
     },
   };
 }
@@ -239,7 +243,7 @@ export async function makeKit(opts = {}) {
 
   const sandbox = {
     sandboxSupport: async () => (opts.sandboxOk === false ? { ok: false, flag: null, detail: 'Node permission model is unavailable' } : { ok: true, flag: '--permission', detail: 'ok' }),
-    createWorkspace: async ({ dir }) => fakeWorkspace({ dir }, guard),
+    createWorkspace: async ({ dir }) => fakeWorkspace({ dir }, guard, { noStatus: opts.workspaceNoStatus === true }),
   };
 
   const builder = { async buildItem(o) {
@@ -295,7 +299,7 @@ export async function makeKit(opts = {}) {
           score: results.length ? passed / results.length : 0, acceptanceIntact: intact,
           allPassed: results.length > 0 && passed === results.length && intact, testerModel: judged.model,
         };
-        return opts.mutateReport ? opts.mutateReport(report, o) : report;
+        return opts.mutateReport ? await opts.mutateReport(report, o) : report;
       } finally { guard.active--; order.push(`tester.settled ${o.scope.kind}`); }
     },
   };

@@ -9,8 +9,8 @@ import { resolveDeps } from './deps.mjs';
 import { renderPlanFacts } from './plan-facts.mjs';
 import { fallbackReport } from './report-fallback.mjs';
 import {
-  applyPlanReviewRules, confirmedStaleFindings, decideStatus, itemChecksPass, normalizeViolations, orderItems,
-  overrideReflection, reportAllPassed,
+  applyPlanReviewRules, bindingProblem, confirmedStaleFindings, decideStatus, isCommitSha, itemChecksPass, normalizeViolations,
+  orderItems, overrideReflection, reportAllPassed,
 } from './rules.mjs';
 import {
   CancelledError, EngineError, LimitExceededError, iso, isRecord, json, makeRedactor, makeRunId, normalizeUsage, pad,
@@ -107,7 +107,7 @@ class Run {
 
     this.brief = null; this.research = null; this.spec = null; this.planReview = null; this.planCheck = null;
     this.approvedSpecVersion = null; this.workspace = null; this.acceptance = null; this.best = null;
-    this.finalReport = null; this.finalReview = null; this.factCheck = null; this.lastBuilderModel = null;
+    this.finalReport = null; this.finalReview = null; this.factCheck = null; this.lastBuilderModel = null; this.candidateCheck = null;
     this.outcome = null;           // { status, reason } set by terminal paths
     this.confirmResolve = null;
 
@@ -918,9 +918,39 @@ class Run {
       }
     }
     await this.factCheckPhase();
+    await this.verifyFinalCandidate();
+  }
+
+  /**
+   * "Delivered" must describe the product that is really in the workspace. After the last test, review and fact check
+   * (nothing builds or tests after this point) the engine looks at the workspace itself: HEAD must equal the commit the
+   * final all-scope report tested, and the tree must be clean. Fails closed: anything it cannot verify is not delivered.
+   */
+  async verifyFinalCandidate() {
+    const candidate = this.finalReport?.candidate;
+    const result = { ok: false, candidate: isCommitSha(candidate) ? candidate : null, reason: null };
+    this.candidateCheck = result;
+    if (!isCommitSha(candidate)) { result.reason = 'the final test report names no valid candidate commit'; return result; }
+    if (!this.workspace) { result.reason = 'there is no workspace to verify'; return result; }
+    const git = this.workspace.git;
+    try {
+      const head = await git.head();
+      if (head !== candidate) { result.reason = `the workspace HEAD (${String(head).slice(0, 7)}) is not the tested candidate (${candidate.slice(0, 7)})`; return result; }
+      let dirty;
+      if (typeof git.status === 'function') dirty = statusLines(await git.status());
+      else if (typeof git.isClean === 'function') dirty = (await git.isClean()) ? [] : ['uncommitted changes'];
+      else dirty = (await git.changedFiles(candidate)) ?? [];   // tracked changes only: the contract has no untracked-file query
+      if (dirty.length) { result.reason = `the workspace has uncommitted changes after the final test (${dirty.slice(0, 5).join(', ')})`; return result; }
+    } catch (error) {
+      result.reason = `the workspace could not be verified: ${this.redact(error?.message ?? 'git failed')}`;
+      return result;
+    }
+    result.ok = true;
+    return result;
   }
 
   async finalTest() {
+    this.candidateCheck = null;
     await this.setPhase('final_test');
     const report = await this.runTests({ kind: 'all' }, this.lastBuilderModel, 'final test');
     this.finalReport = report;
@@ -1027,7 +1057,13 @@ class Run {
         else this.note('engine', `The reporter failed (${error?.code ?? 'error'}); the engine wrote the report.`);
       }
     }
-    const reason = this.outcome?.reason ?? (status === 'delivered' ? null : this.limitHit ? `the ${this.limitHit} limit was reached` : null);
+    const gap = this.bindingGap();
+    if (gap) {
+      this.note('engine', `Not marked delivered: ${gap}.`);
+      // The reporter does not know about this check, so the engine states it itself, after the reporter's text.
+      if (markdown) markdown = `${markdown.trimEnd()}\n\n> Engine note: every check passed, but this run is not marked delivered because ${gap}.\n`;
+    }
+    const reason = this.outcome?.reason ?? (status === 'delivered' ? null : gap ? `every check passed but ${gap}` : this.limitHit ? `the ${this.limitHit} limit was reached` : null);
     if (!markdown) {
       markdown = fallbackReport({
         wish: this.wish, brief: this.brief, spec: this.spec, status: this.decideStatus(),
@@ -1050,7 +1086,17 @@ class Run {
     if (this.outcome?.status === 'failed') return 'failed';
     return decideStatus({
       finalReport: this.finalReport, finalReview: this.finalReview, approvedSpecVersion: this.approvedSpecVersion,
-      specVersion: this.spec?.specVersion ?? null, limitHit: this.limitHit, fatal: false,
+      specVersion: this.spec?.specVersion ?? null, limitHit: this.limitHit, fatal: false, candidateCheck: this.candidateCheck,
+    });
+  }
+
+  /** When everything else says "delivered" but the candidate cannot be bound to the workspace: why not (else null). */
+  bindingGap() {
+    if (this.outcome || this.limitHit) return null;
+    if (!this.finalReport || !reportAllPassed(this.finalReport) || this.finalReview?.verdict !== 'ship') return null;
+    return bindingProblem({
+      finalReport: this.finalReport, finalReview: this.finalReview, approvedSpecVersion: this.approvedSpecVersion,
+      specVersion: this.spec?.specVersion ?? null, candidateCheck: this.candidateCheck,
     });
   }
 
@@ -1062,7 +1108,7 @@ class Run {
     const finalScore = typeof this.finalReport?.score === 'number' ? this.finalReport.score : null;
     const allPassed = reportAllPassed(this.finalReport);
     const summaryText = status === 'delivered' ? 'Delivered: every check passed and the final review said ship.'
-      : status === 'partial' ? `Partial: ${this.finalReport?.summary?.passed ?? 0} of ${this.finalReport?.summary?.total ?? 0} checks passed.`
+      : status === 'partial' ? `Partial: ${this.finalReport?.summary?.passed ?? 0} of ${this.finalReport?.summary?.total ?? 0} checks passed${this.bindingGap() ? `; not delivered because ${this.bindingGap()}` : ''}.`
       : status === 'cancelled' ? `Cancelled: ${this.cancelReason ?? 'by the user'}.`
       : `Failed: ${this.outcome?.reason ?? 'no check passed'}.`;
     this.state.status = status;
@@ -1076,6 +1122,7 @@ class Run {
         status, summary: truncate(this.redact(summaryText), 500), finalScore, allPassed, candidate: this.finalReport?.candidate ?? null,
         specVersion: this.spec?.specVersion ?? null, approvedSpecVersion: this.approvedSpecVersion,
         finalReviewVerdict: this.finalReview?.verdict ?? null, reportPath: this.reportPath ? 'REPORT.md' : null,
+        candidateCheck: this.candidateCheck ? { ok: this.candidateCheck.ok, reason: this.candidateCheck.reason } : null,
         previewPath: this.state.previewPath, spentUsd: this.state.spend.usd, minutes,
       });
       await this.emit('room.closed', {
@@ -1159,6 +1206,12 @@ class Run {
   }
 
   closeOpenTools() { this.openTools = []; }
+}
+
+/** Lines of a git status result (string or array); blank lines dropped. */
+function statusLines(value) {
+  const list = Array.isArray(value) ? value : String(value ?? '').split(String.fromCharCode(10));
+  return list.map(x => String(x).trim()).filter(Boolean);
 }
 
 function countStale(fc) { return (fc?.findings ?? []).filter(f => f?.verdict === 'stale').length; }

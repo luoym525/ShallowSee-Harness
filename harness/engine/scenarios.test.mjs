@@ -367,8 +367,6 @@ test('delivered needs real evidence: a tester that claims allPassed with a skipp
   assert.equal(tampered.summary.status, 'partial');
   const unfit = await execute(t, { reviewFinal: () => ({ verdict: 'iterate', iterateItems: [], gaps: ['Missing polish'] }) });
   assert.equal(unfit.summary.status, 'partial');
-  const mismatched = await execute(t, { reviewFinal: () => ({ verdict: 'ship' }), mutateReport: (r, o) => (r.scope.kind === 'all' ? { ...r, candidate: 'a'.repeat(40) } : r) });
-  assert.equal(mismatched.summary.status, 'delivered', 'the review is bound to the report the engine holds');
   const { kit, runId } = lying;
   assert.ok((await readText(kit.dataDir, runId, 'REPORT.md')).length > 0);
 });

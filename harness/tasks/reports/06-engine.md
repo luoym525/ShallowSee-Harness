@@ -15,7 +15,7 @@ The whole state machine from ARCHITECTURE §1, behind `startRun`, plus the CLI. 
 ## How to run / test
 ```
 node --test "harness/engine/**/*.test.mjs"
-# tests 35 · pass 35 · fail 0 · cancelled 0 · skipped 0 · duration_ms ~36000
+# tests 45 · pass 45 · fail 0 · cancelled 0 · skipped 0
 
 node samples/validate-events.mjs <happy-path events.jsonl>        (the happy-path test also runs this itself)
 ok    …/rooms/hr-20261115-053635-xv0j/events.jsonl: 134 events, 0 problem(s), 69 warning(s)
@@ -37,6 +37,10 @@ Covered scenarios (each asserts events and artifacts): happy path (delivered, ke
 - Pinned model: every provider request of a skill call goes to exactly `providerIdentity.model`, equal to the child room's recorded provenance; a non-retryable failure of that model reruns the whole skill once with the router's next fallback in a **new** child room.
 - Builder/tester option objects are asserted to have no `search`/`skill`/config key; only intake, researcher, planner get `ctx.search`.
 
+## Review fix: P1 "delivered" binding (room #351, lym-astra-monitor)
+`decideStatus` used `finalReview.candidate === finalReport.candidate`, so `null === null` passed and a run with every check passing, a ship review and no candidate was `delivered`. Fixed in `rules.mjs` (`bindingProblem`, `isCommitSha`) and `engine.mjs` (`verifyFinalCandidate`): `delivered` now also requires a valid 40-lowercase-hex candidate on the report, the report's scope to be `all`, the review bound to the same SHA and spec version, **the workspace's actual HEAD to equal that SHA, and a clean tree**. The check runs after the final test, review and fact check and fails closed (an unverifiable workspace is not delivered); the engine never commits a dirty tree to make it match. The result is in `harness.run.finished.candidateCheck` and an "Engine note" at the end of REPORT.md says why a run whose checks all passed is `partial`. Regression tests (`binding.test.mjs`, `rules.test.mjs`): null/undefined/malformed/uppercase/foreign candidate, non-`all` scope, untracked and tracked dirty tree, no-`status()` fallback, git failure; these four binding scenarios fail on the previous commit ed022e6 (0 pass / 4 fail) and pass now. The old test that asserted "delivered" for a foreign candidate SHA was wrong and was removed.
+Limit: the contracted Workspace has no status query, so without `git.status()` / `git.isClean()` the clean-tree check uses `changedFiles(candidate)` and cannot see untracked files (see contract request 7).
+
 ## Not done / known gaps
 - **Integration run with real models: not done.** `providers`, `router`, `roles`, `workers/*` are not merged on this branch, so `deps.mjs` has only been exercised for its "module not merged yet" path (a run with no deps ends `failed` with `error.code: "module_not_merged"`, a state, and a REPORT.md). The first real run will show any shape mismatch with the real modules.
 - Assumptions about real modules I could not check: `roles.checkSpecRules(spec)` returns `string[]` (or `{ violations | errors | issues }`); `roles.reviewer.reviewPlan` returns a `PlanReview` (the engine overwrites the engine-filled fields); `providers.createModelClient({ config, pricing })` and `createSearchClient({ config })`; `router.selectModel(req, roster, { overrides, preferVendorDiversity })` throws `code: "no_match"` when the avoid lists leave nothing.
@@ -51,6 +55,9 @@ Covered scenarios (each asserts events and artifacts): happy path (delivered, ke
 4. **`harness.skill.completed` for an abandoned first attempt** (pinned model failed, rerun follows) is emitted with `status: "failed"`, `reportPath: null`, `rerunWith: <model>`; only the final attempt has a `reportPath`. UI (08) should pair started/completed by `childRoomId`.
 5. **Additive fields** the contract may want to list: `harness.route.selected` `purpose`, `suggested`; `run.started` `fallbackFrom`; `harness.plan.reviewed` and `plan-review.json` `engineOverrides` (and `modelVerdict` in the file); `harness.candidate.best` `rejected`; `harness.skill.completed` `confirmedStaleCount`, `reason`, `rerunWith`; `harness.run.finished` `approvedSpecVersion`, `finalReviewVerdict`; `state.json` `userConfirmation` (the user's separate confirmation in `confirm_plan` mode; `approval` stays the model's).
 6. **Router `no_match` for the tester.** When avoidance leaves no candidate (for example a Haiku-only roster) the engine retries the route without the avoid lists and appends "no other suitable model is configured" to the route reason, instead of failing the run. Tell me if the router should do this itself.
+
+7. **Workspace dirty check (workstream 04).** Please add `git.status(): Promise<string[]>` (porcelain lines, tracked and untracked) or `git.isClean(): Promise<boolean>` to `Workspace.git`. The engine uses them when present; without them it can only detect tracked changes through `changedFiles(candidate)`. It also assumes `changedFiles(sha)` without `toSha` compares the working tree with `sha`.
+8. `harness.run.finished` gains `candidateCheck: { ok, reason }` (additive), and the final review is bound by `candidate` + `specVersion` (request 2).
 
 ## Integration notes for the engine / PM
 - After merging 01 → 02 → 04 → 05 → 10 → 03, run `node --test "harness/engine/**/*.test.mjs"` (it must not change: tests inject every dependency) and then `node harness/bin/shallowsee.mjs config check --offline`, then the umbrella wish with `--budget-usd 2 --minutes 20`.

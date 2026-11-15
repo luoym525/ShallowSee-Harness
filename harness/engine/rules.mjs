@@ -107,11 +107,33 @@ export function reportAllPassed(report) {
  * Run status (brief 06 §7): delivered iff the final all-scope report passed everything, the final
  * review says ship, and both are bound to the same candidate commit and the approved spec version.
  */
-export function decideStatus({ finalReport, finalReview, approvedSpecVersion, specVersion, limitHit, fatal }) {
+export const isCommitSha = value => typeof value === 'string' && /^[0-9a-f]{40}$/.test(value);
+
+/**
+ * Why a final candidate is (not) deliverable, from facts only. `candidateCheck` is the engine's own look at the
+ * workspace after the last test: { ok, candidate, reason } where ok means "HEAD equals candidate and the tree is clean".
+ * A null or malformed candidate never binds (null === null must not pass), the report must be the scope-"all" one,
+ * and the review, the report, the workspace and the approved spec version must all name the same things.
+ */
+export function bindingProblem({ finalReport, finalReview, approvedSpecVersion, specVersion, candidateCheck }) {
+  if (!finalReport) return 'there is no final test report';
+  if (finalReport.scope?.kind !== 'all') return 'the final test report does not cover all checks';
+  if (!isCommitSha(finalReport.candidate)) return 'the final test report names no valid candidate commit';
+  if (!finalReview) return 'there is no final review';
+  if (finalReview.candidate !== finalReport.candidate) return 'the final review and the final test report describe different commits';
+  if (!Number.isSafeInteger(specVersion) || finalReview.specVersion !== specVersion || approvedSpecVersion !== specVersion) {
+    return 'the final review or the approval is not bound to the current spec version';
+  }
+  if (candidateCheck?.ok !== true || candidateCheck.candidate !== finalReport.candidate) {
+    return candidateCheck?.reason ?? 'the workspace was not checked against the tested candidate';
+  }
+  return null;
+}
+
+export function decideStatus({ finalReport, finalReview, approvedSpecVersion, specVersion, limitHit, fatal, candidateCheck }) {
   const anyPassed = (finalReport?.summary?.passed ?? 0) > 0;
   if (fatal) return anyPassed ? 'partial' : 'failed';
-  const bound = finalReview && finalReport && finalReview.candidate === finalReport.candidate
-    && finalReview.specVersion === specVersion && approvedSpecVersion === specVersion;
+  const bound = bindingProblem({ finalReport, finalReview, approvedSpecVersion, specVersion, candidateCheck }) === null;
   if (!limitHit && reportAllPassed(finalReport) && finalReview?.verdict === 'ship' && bound) return 'delivered';
   return anyPassed ? 'partial' : 'failed';
 }
