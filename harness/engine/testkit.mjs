@@ -98,8 +98,8 @@ export async function fakeWorkspace({ dir }, guard, options = {}) {
       async tag() {}, async treeHash() { return 'tree'; }, async restorePath() {},
       // changedFiles(from): tracked changes between `from` and the working tree (like `git diff --name-only from`).
       async changedFiles(from) { return git('diff', '--name-only', from).split(/\r?\n/).filter(Boolean); },
-      // status(): `git status --porcelain` lines (tracked and untracked). Not in the Workspace contract; the engine uses it when present.
-      ...(options.noStatus ? {} : { async status() { return git('status', '--porcelain').split(/\r?\n/).filter(Boolean); } }),
+      // status(): Workspace.git.status() → { clean, changed } from `git status --porcelain` (tracked and untracked).
+      ...(options.noStatus ? {} : { async status() { const changed = git('status', '--porcelain').split(String.fromCharCode(10)).map(l => l.trim()).filter(Boolean); return { clean: changed.length === 0, changed }; } }),
     },
   };
 }

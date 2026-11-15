@@ -936,11 +936,19 @@ class Run {
     try {
       const head = await git.head();
       if (head !== candidate) { result.reason = `the workspace HEAD (${String(head).slice(0, 7)}) is not the tested candidate (${candidate.slice(0, 7)})`; return result; }
-      let dirty;
-      if (typeof git.status === 'function') dirty = statusLines(await git.status());
-      else if (typeof git.isClean === 'function') dirty = (await git.isClean()) ? [] : ['uncommitted changes'];
-      else dirty = (await git.changedFiles(candidate)) ?? [];   // tracked changes only: the contract has no untracked-file query
-      if (dirty.length) { result.reason = `the workspace has uncommitted changes after the final test (${dirty.slice(0, 5).join(', ')})`; return result; }
+      // Contract: Workspace.git.status() → { clean, changed } (read-only, tracked and untracked). No fallback: a missing,
+      // throwing or malformed status() means the workspace is NOT known to be clean, so the run cannot be delivered.
+      if (typeof git.status !== 'function') { result.reason = 'the workspace cannot report whether it is clean (git.status() is missing)'; return result; }
+      const status = await git.status();
+      if (!isRecord(status) || typeof status.clean !== 'boolean' || !Array.isArray(status.changed)) {
+        result.reason = 'the workspace returned an unusable git.status() result';
+        return result;
+      }
+      if (!status.clean || status.changed.length) {
+        const changed = status.changed.map(x => String(x)).slice(0, 5);
+        result.reason = `the workspace has uncommitted changes after the final test${changed.length ? ` (${changed.join(', ')})` : ''}`;
+        return result;
+      }
     } catch (error) {
       result.reason = `the workspace could not be verified: ${this.redact(error?.message ?? 'git failed')}`;
       return result;
@@ -1206,12 +1214,6 @@ class Run {
   }
 
   closeOpenTools() { this.openTools = []; }
-}
-
-/** Lines of a git status result (string or array); blank lines dropped. */
-function statusLines(value) {
-  const list = Array.isArray(value) ? value : String(value ?? '').split(String.fromCharCode(10));
-  return list.map(x => String(x).trim()).filter(Boolean);
 }
 
 function countStale(fc) { return (fc?.findings ?? []).filter(f => f?.verdict === 'stale').length; }

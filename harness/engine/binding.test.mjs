@@ -57,15 +57,50 @@ test('a dirty workspace (untracked file, or a tracked file changed after the tes
   const tested = (await readJson(tracked.kit.dataDir, tracked.runId, 'tests/final.json')).candidate;
   assert.equal(finishedOf(tracked.events).candidate, tested, 'the reported candidate is still the tested commit: nothing was committed on top');
 
-  // A workspace whose git has no status() falls back to the contracted changedFiles(candidate): tracked changes are still caught.
-  const noStatusDirty = await execute(t, { workspaceNoStatus: true, mutateReport: forAll(async (r, o) => { await o.workspace.writeFile('W1.txt', 'edited'); return r; }) });
-  assert.equal(noStatusDirty.summary.status, 'partial');
-  assert.match(finishedOf(noStatusDirty.events).candidateCheck.reason, /W1\.txt/);
-  const noStatusClean = await execute(t, { workspaceNoStatus: true });
-  assert.equal(noStatusClean.summary.status, 'delivered');
+  const control = await execute(t);
+  assert.equal(control.summary.status, 'delivered', 'control: the same run with a clean workspace delivers');
 });
 
-test('when the workspace cannot be verified the run fails closed; a clean matching candidate still delivers and records the check', async t => {
+// Contract ruling (room #366): Workspace.git.status() → { clean, changed }. Missing, throwing or malformed means NOT clean.
+async function withStatus(t, statusImpl) {
+  const kit = await makeKit({ builder: ok });
+  t.after(kit.cleanup);
+  const create = kit.deps.sandbox.createWorkspace;
+  kit.deps.sandbox.createWorkspace = async o => { const ws = await create(o); if (statusImpl === undefined) delete ws.git.status; else ws.git.status = statusImpl(ws); return ws; };
+  const handle = startRun({ wish: WISH, config: kit.config, dataDir: kit.dataDir, deps: kit.deps });
+  const summary = await handle.done;
+  return { summary, finished: finishedOf(await readLog(kit.dataDir, handle.runId)) };
+}
+
+test('git.status() is required: a missing method fails closed, even for a clean workspace; there is no changedFiles fallback', async t => {
+  const missing = await withStatus(t, undefined);
+  assert.equal(missing.summary.status, 'partial');
+  assert.equal(missing.finished.allPassed, true);
+  assert.match(missing.finished.candidateCheck.reason, /cannot report whether it is clean \(git\.status\(\) is missing\)/);
+  const noStatusKit = await execute(t, { workspaceNoStatus: true });
+  assert.equal(noStatusKit.summary.status, 'partial', 'a clean tree is still not delivered when the sandbox cannot say so');
+});
+
+test('git.status() that throws, or returns an unusable shape, or reports dirty, is not delivered', async t => {
+  const throwing = await withStatus(t, () => async () => { throw new Error('status exploded ' + FAKE_KEY); });
+  assert.equal(throwing.summary.status, 'partial');
+  assert.match(throwing.finished.candidateCheck.reason, /could not be verified: status exploded/);
+  assert.ok(!throwing.finished.candidateCheck.reason.includes(FAKE_KEY));
+  for (const bad of [undefined, null, 'clean', [], { clean: 'yes', changed: [] }, { clean: true }, { changed: [] }]) {
+    const run = await withStatus(t, () => async () => bad);
+    assert.equal(run.summary.status, 'partial', JSON.stringify(bad));
+    assert.match(run.finished.candidateCheck.reason, /unusable git\.status\(\) result/);
+  }
+  const dirtyFlag = await withStatus(t, () => async () => ({ clean: false, changed: [] }));
+  assert.equal(dirtyFlag.summary.status, 'partial');
+  assert.match(dirtyFlag.finished.candidateCheck.reason, /uncommitted changes after the final test/);
+  const contradictory = await withStatus(t, () => async () => ({ clean: true, changed: ['M x.txt'] }));
+  assert.equal(contradictory.summary.status, 'partial');
+  const reported = await withStatus(t, () => async () => ({ clean: false, changed: ['?? a', 'M b'] }));
+  assert.match(reported.finished.candidateCheck.reason, /\(\?\? a, M b\)/);
+});
+
+test('a clean matching candidate delivers and records the check; a git failure inside status() is redacted', async t => {
   const kit = await makeKit({ builder: ok });
   t.after(kit.cleanup);
   const create = kit.deps.sandbox.createWorkspace;
