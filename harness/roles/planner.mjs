@@ -41,6 +41,9 @@ const SYSTEM = `Design the smallest complete product that solves the Brief. Use 
 and name important assumptions. Keep the plan at what and why, plus a short file-level architecture.
 Choose static-web with a relative HTML entry or node with a relative .mjs CLI or server entry. Use zero dependencies.
 Plan two to eight small work items W1 through Wn in dependency order and give each at least one distinct acceptance check.
+Include a work item for the root README.md, with README.md listed in its files. It must explain how to run and use
+the product, including required arguments and setup. Give that item a file check on README.md with a mustContain
+entry exactly equal to the declared HTML entry path or the Node launch command prefix (for example, "node cli.mjs").
 List each check on its owning item. Commands execute node with a relative .mjs path. Use direct CLI checks with
 expected stdout when feasible. Use loopback HTTP checks for servers on ports 4400–4499. At least 60% of checks
 must be command, file, or HTTP checks. Make all expectations observable and specific.
@@ -110,6 +113,20 @@ function checkAcceptanceRule(check) {
   return null;
 }
 
+function checkReadme(spec, checks) {
+  const readmeItems = spec.workItems.filter(item => item.files.includes('README.md'));
+  if (!readmeItems.length) return 'Plan a work item that lists the root README.md as a deliverable.';
+
+  const launch = spec.entry.kind === 'open_html' ? spec.entry.path : spec.entry.run.slice(0, 2).join(' ');
+  const covered = readmeItems.some(item => item.checkIds.some(id => {
+    const check = checks.get(id);
+    return check?.type === 'file' && check.itemId === item.id && check.path === 'README.md'
+      && check.mustContain?.includes(launch);
+  }));
+  if (!covered) return 'The README.md work item must have a file check for the launch path or command: ' + launch + '.';
+  return null;
+}
+
 export function checkSpecRules(spec) {
   const { errors: shape } = validateJson(specSchema, spec);
   if (shape.length) return shape;
@@ -145,6 +162,8 @@ export function checkSpecRules(spec) {
   for (const check of spec.acceptance) {
     if (!linked.has(check.id)) violations.push(check.id + ': Link the check from its owning work item.');
   }
+  const readmeIssue = checkReadme(spec, checks);
+  if (readmeIssue) violations.push(readmeIssue);
   const executable = spec.acceptance.filter(check => ['command', 'file', 'http'].includes(check.type)).length;
   if (executable * 5 < spec.acceptance.length * 3) violations.push('At least 60% of acceptance checks must be executable.');
   return violations;
