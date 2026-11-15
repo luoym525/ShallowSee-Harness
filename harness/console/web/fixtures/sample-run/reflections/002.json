@@ -1,0 +1,9 @@
+{
+  "itemId": "W2",
+  "decision": "escalate",
+  "reason": "The coder read hourly data instead of tomorrow's daily maximum. A stronger coder should fix the parsing.",
+  "fixInstructions": "In parseTomorrow, read daily.precipitation_probability_max[1] and daily.precipitation_sum[1]; don't use the hourly arrays.",
+  "lessons": [
+    "Open-Meteo daily values need daily= in the query string; index 1 is tomorrow."
+  ]
+}

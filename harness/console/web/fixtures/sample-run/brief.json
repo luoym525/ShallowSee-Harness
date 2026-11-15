@@ -1,0 +1,43 @@
+{
+  "title": "Umbrella Check",
+  "restatedGoal": "One web page that says whether to take an umbrella tomorrow, using the forecast for where you are.",
+  "targetUser": "Anyone who wants a quick yes or no about rain tomorrow, with no setup",
+  "productKind": "web_page",
+  "mustHaves": [
+    "A clear answer: take an umbrella tomorrow, or not",
+    "Uses the visitor's location, with a city search as a fallback",
+    "Shows tomorrow's chance of rain and expected rainfall",
+    "Works without an account or an API key",
+    "Explains in plain words when the forecast can't be loaded"
+  ],
+  "niceToHaves": [
+    "Remembers the last city searched"
+  ],
+  "assumptions": [
+    {
+      "topic": "Location",
+      "assumed": "Ask the browser for the location; if that is refused, let the visitor type a city",
+      "why": "The wish doesn't say where the visitor is"
+    },
+    {
+      "topic": "When to take an umbrella",
+      "assumed": "Yes when tomorrow's chance of rain is 40% or more, or at least 1 mm of rain is expected",
+      "why": "A common rule of thumb; the page shows the rule so it isn't hidden"
+    },
+    {
+      "topic": "Units",
+      "assumed": "Millimetres and percent",
+      "why": "The forecast service's defaults"
+    }
+  ],
+  "constraints": [
+    "No API keys required",
+    "Static files only (HTML, CSS, JavaScript)"
+  ],
+  "researchQuestions": [
+    "Which free weather forecast API works from a browser without a key?",
+    "How do I get tomorrow's chance of rain from it?",
+    "How do I turn a city name into coordinates?"
+  ],
+  "refused": null
+}

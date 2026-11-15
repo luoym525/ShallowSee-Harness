@@ -1,0 +1,53 @@
+{
+  "scope": {
+    "kind": "item",
+    "itemId": "W1",
+    "includeRegression": true
+  },
+  "candidate": "a1c3e5f",
+  "results": [
+    {
+      "checkId": "A1",
+      "itemId": "W1",
+      "type": "file",
+      "status": "pass",
+      "evidence": {
+        "quotes": [
+          {
+            "file": "index.html",
+            "text": "<h1>Umbrella Check</h1>"
+          }
+        ]
+      },
+      "message": "index.html contains the title and an input",
+      "durationMs": 4
+    },
+    {
+      "checkId": "A2",
+      "itemId": "W1",
+      "type": "command",
+      "status": "pass",
+      "evidence": {
+        "command": [
+          "node",
+          "acceptance/a2-layout.test.mjs"
+        ],
+        "exitCode": 0,
+        "stdoutTail": "ok search form\nok result area\n"
+      },
+      "message": "exit code 0",
+      "durationMs": 182
+    }
+  ],
+  "summary": {
+    "total": 2,
+    "passed": 2,
+    "failed": 0,
+    "errored": 0,
+    "skipped": 0
+  },
+  "score": 1,
+  "acceptanceIntact": true,
+  "allPassed": true,
+  "testerModel": "anthropic/claude-sonnet-5-5"
+}

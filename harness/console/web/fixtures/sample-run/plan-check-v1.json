@@ -1,0 +1,206 @@
+{
+  "status": "completed",
+  "reason": null,
+  "childRoomId": "hr-20261115-013012-a1b2-sl-01",
+  "doc": {
+    "label": "plan-facts-v1.md",
+    "sha256": "37fe7f20ac265b0d3e82efb09d362d60d5057d643dea801e6bf8efd2cdc9f447"
+  },
+  "findings": [
+    {
+      "claimId": "C1",
+      "line": 1,
+      "quote": "The Open-Meteo forecast API needs no API key for non-commercial use",
+      "statement": "The Open-Meteo forecast API needs no API key for non-commercial use",
+      "category": "policy",
+      "verdict": "fresh",
+      "currentValue": null,
+      "correction": null,
+      "sources": [
+        {
+          "name": "Terms | Open-Meteo",
+          "url": "https://open-meteo.com/en/terms",
+          "domain": "open-meteo.com",
+          "snippet": "Free for non-commercial use; no API key needed.",
+          "retrievedAt": "2026-11-15T01:31:14.000Z"
+        },
+        {
+          "name": "Weather Forecast API | Open-Meteo",
+          "url": "https://open-meteo.com/en/docs",
+          "domain": "open-meteo.com",
+          "snippet": "Daily variables include precipitation_probability_max and precipitation_sum; forecast_days sets how many days are returned.",
+          "retrievedAt": "2026-11-15T01:31:02.000Z"
+        }
+      ],
+      "checks": [
+        {
+          "check": "quote_in_doc",
+          "passed": true,
+          "detail": "The quoted text is in the document."
+        },
+        {
+          "check": "independent_sources",
+          "passed": true,
+          "detail": "Two different sites contained the value (mechanical check); editorial independence not reviewed."
+        },
+        {
+          "check": "correction_supported",
+          "passed": true,
+          "detail": "No correction proposed."
+        },
+        {
+          "check": "patch_scope",
+          "passed": true,
+          "detail": "The patch changes only the quoted line."
+        }
+      ]
+    },
+    {
+      "claimId": "C2",
+      "line": 3,
+      "quote": "returns at most 7 days of forecast",
+      "statement": "The Open-Meteo forecast API returns at most 7 days of forecast",
+      "category": "limit",
+      "verdict": "stale",
+      "currentValue": "up to 16 days (forecast_days; the default is 7)",
+      "correction": "returns up to 16 days of forecast (forecast_days; the default is 7)",
+      "sources": [
+        {
+          "name": "Weather Forecast API | Open-Meteo",
+          "url": "https://open-meteo.com/en/docs",
+          "domain": "open-meteo.com",
+          "snippet": "Daily variables include precipitation_probability_max and precipitation_sum; forecast_days sets how many days are returned.",
+          "retrievedAt": "2026-11-15T01:31:02.000Z"
+        },
+        {
+          "name": "open-meteo/open-meteo on GitHub",
+          "url": "https://github.com/open-meteo/open-meteo",
+          "domain": "github.com",
+          "snippet": "Open-source weather API with forecasts of up to 16 days.",
+          "retrievedAt": "2026-11-15T01:33:40.000Z"
+        }
+      ],
+      "checks": [
+        {
+          "check": "quote_in_doc",
+          "passed": true,
+          "detail": "The quoted text is in the document."
+        },
+        {
+          "check": "independent_sources",
+          "passed": true,
+          "detail": "Two different sites contained the value (mechanical check); editorial independence not reviewed."
+        },
+        {
+          "check": "correction_supported",
+          "passed": true,
+          "detail": "Both sources contain the proposed value."
+        },
+        {
+          "check": "patch_scope",
+          "passed": true,
+          "detail": "The patch changes only the quoted line."
+        }
+      ]
+    },
+    {
+      "claimId": "C3",
+      "line": 5,
+      "quote": "City names are turned into coordinates with the Open-Meteo geocoding search",
+      "statement": "City names are turned into coordinates with the Open-Meteo geocoding search",
+      "category": "other",
+      "verdict": "fresh",
+      "currentValue": null,
+      "correction": null,
+      "sources": [
+        {
+          "name": "Geocoding API | Open-Meteo",
+          "url": "https://open-meteo.com/en/docs/geocoding-api",
+          "domain": "open-meteo.com",
+          "snippet": "Search a place by name and get its latitude and longitude.",
+          "retrievedAt": "2026-11-15T01:31:09.000Z"
+        },
+        {
+          "name": "open-meteo/open-meteo on GitHub",
+          "url": "https://github.com/open-meteo/open-meteo",
+          "domain": "github.com",
+          "snippet": "Open-source weather API with forecasts of up to 16 days.",
+          "retrievedAt": "2026-11-15T01:33:40.000Z"
+        }
+      ],
+      "checks": [
+        {
+          "check": "quote_in_doc",
+          "passed": true,
+          "detail": "The quoted text is in the document."
+        },
+        {
+          "check": "independent_sources",
+          "passed": true,
+          "detail": "Two different sites contained the value (mechanical check); editorial independence not reviewed."
+        },
+        {
+          "check": "correction_supported",
+          "passed": true,
+          "detail": "No correction proposed."
+        },
+        {
+          "check": "patch_scope",
+          "passed": true,
+          "detail": "The patch changes only the quoted line."
+        }
+      ]
+    },
+    {
+      "claimId": "C4",
+      "line": 7,
+      "quote": "Browser geolocation only works in a secure context (https or localhost)",
+      "statement": "Browser geolocation only works in a secure context (https or localhost)",
+      "category": "policy",
+      "verdict": "fresh",
+      "currentValue": null,
+      "correction": null,
+      "sources": [
+        {
+          "name": "Geolocation API | MDN",
+          "url": "https://developer.mozilla.org/en-US/docs/Web/API/Geolocation_API",
+          "domain": "developer.mozilla.org",
+          "snippet": "Available only in secure contexts; the browser asks the visitor for permission.",
+          "retrievedAt": "2026-11-15T01:31:20.000Z"
+        },
+        {
+          "name": "Geolocation | W3C",
+          "url": "https://www.w3.org/TR/geolocation/",
+          "domain": "w3.org",
+          "snippet": "The API is restricted to secure contexts.",
+          "retrievedAt": "2026-11-15T01:33:44.000Z"
+        }
+      ],
+      "checks": [
+        {
+          "check": "quote_in_doc",
+          "passed": true,
+          "detail": "The quoted text is in the document."
+        },
+        {
+          "check": "independent_sources",
+          "passed": true,
+          "detail": "Two different sites contained the value (mechanical check); editorial independence not reviewed."
+        },
+        {
+          "check": "correction_supported",
+          "passed": true,
+          "detail": "No correction proposed."
+        },
+        {
+          "check": "patch_scope",
+          "passed": true,
+          "detail": "The patch changes only the quoted line."
+        }
+      ]
+    }
+  ],
+  "diff": "--- plan-facts-v1.md\n+++ plan-facts-v1.md\n@@ -3 +3 @@\n-The Open-Meteo forecast API returns at most 7 days of forecast\n+The Open-Meteo forecast API returns up to 16 days of forecast (forecast_days; the default is 7)\n",
+  "reviewStatus": "unreviewed",
+  "searchesUsed": 4
+}

@@ -1,0 +1,151 @@
+{
+  "status": "completed",
+  "reason": null,
+  "childRoomId": "hr-20261115-013012-a1b2-sl-03",
+  "doc": {
+    "label": "README.md",
+    "sha256": "9747d0b94c77fa68a7749bd52470b4d0b9a76b8f53292731035ec78e29ce5ee4"
+  },
+  "findings": [
+    {
+      "claimId": "R1",
+      "line": 5,
+      "quote": "Open-Meteo is free for non-commercial use and needs no API key",
+      "statement": "Open-Meteo is free for non-commercial use and needs no API key",
+      "category": "policy",
+      "verdict": "fresh",
+      "currentValue": null,
+      "correction": null,
+      "sources": [
+        {
+          "name": "Terms | Open-Meteo",
+          "url": "https://open-meteo.com/en/terms",
+          "domain": "open-meteo.com",
+          "snippet": "Free for non-commercial use; no API key needed.",
+          "retrievedAt": "2026-11-15T01:31:14.000Z"
+        },
+        {
+          "name": "Weather Forecast API | Open-Meteo",
+          "url": "https://open-meteo.com/en/docs",
+          "domain": "open-meteo.com",
+          "snippet": "Daily variables include precipitation_probability_max and precipitation_sum; forecast_days sets how many days are returned.",
+          "retrievedAt": "2026-11-15T01:31:02.000Z"
+        }
+      ],
+      "checks": [
+        {
+          "check": "quote_in_doc",
+          "passed": true,
+          "detail": "The quoted text is in the document."
+        },
+        {
+          "check": "independent_sources",
+          "passed": true,
+          "detail": "Two different sites contained the value (mechanical check); editorial independence not reviewed."
+        },
+        {
+          "check": "correction_supported",
+          "passed": true,
+          "detail": "No correction proposed."
+        },
+        {
+          "check": "patch_scope",
+          "passed": true,
+          "detail": "The patch changes only the quoted line."
+        }
+      ]
+    },
+    {
+      "claimId": "R2",
+      "line": 7,
+      "quote": "forecasts up to 7 days ahead",
+      "statement": "Open-Meteo forecasts up to 7 days ahead",
+      "category": "limit",
+      "verdict": "stale",
+      "currentValue": "up to 16 days (forecast_days; the default is 7)",
+      "correction": "forecasts up to 16 days ahead (7 by default)",
+      "sources": [
+        {
+          "name": "Weather Forecast API | Open-Meteo",
+          "url": "https://open-meteo.com/en/docs",
+          "domain": "open-meteo.com",
+          "snippet": "Daily variables include precipitation_probability_max and precipitation_sum; forecast_days sets how many days are returned.",
+          "retrievedAt": "2026-11-15T01:31:02.000Z"
+        },
+        {
+          "name": "open-meteo/open-meteo on GitHub",
+          "url": "https://github.com/open-meteo/open-meteo",
+          "domain": "github.com",
+          "snippet": "Open-source weather API with forecasts of up to 16 days.",
+          "retrievedAt": "2026-11-15T01:33:40.000Z"
+        }
+      ],
+      "checks": [
+        {
+          "check": "quote_in_doc",
+          "passed": true,
+          "detail": "The quoted text is in the document."
+        },
+        {
+          "check": "independent_sources",
+          "passed": true,
+          "detail": "Two different sites contained the value (mechanical check); editorial independence not reviewed."
+        },
+        {
+          "check": "correction_supported",
+          "passed": true,
+          "detail": "Both sources contain the proposed value."
+        },
+        {
+          "check": "patch_scope",
+          "passed": true,
+          "detail": "The patch changes only the quoted line."
+        }
+      ]
+    },
+    {
+      "claimId": "R3",
+      "line": 9,
+      "quote": "The city search returns up to 10 matching places by default",
+      "statement": "The city search returns up to 10 matching places by default",
+      "category": "limit",
+      "verdict": "unsure",
+      "currentValue": null,
+      "correction": null,
+      "sources": [
+        {
+          "name": "Geocoding API | Open-Meteo",
+          "url": "https://open-meteo.com/en/docs/geocoding-api",
+          "domain": "open-meteo.com",
+          "snippet": "Search a place by name and get its latitude and longitude.",
+          "retrievedAt": "2026-11-15T01:31:09.000Z"
+        }
+      ],
+      "checks": [
+        {
+          "check": "quote_in_doc",
+          "passed": true,
+          "detail": "The quoted text is in the document."
+        },
+        {
+          "check": "independent_sources",
+          "passed": false,
+          "detail": "Only one site stated the value."
+        },
+        {
+          "check": "correction_supported",
+          "passed": true,
+          "detail": "No correction proposed."
+        },
+        {
+          "check": "patch_scope",
+          "passed": true,
+          "detail": "The patch changes only the quoted line."
+        }
+      ]
+    }
+  ],
+  "diff": "--- README.md\n+++ README.md\n@@ -7 +7 @@\n-Open-Meteo forecasts up to 7 days ahead.\n+Open-Meteo forecasts up to 16 days ahead (7 by default).\n",
+  "reviewStatus": "unreviewed",
+  "searchesUsed": 3
+}
