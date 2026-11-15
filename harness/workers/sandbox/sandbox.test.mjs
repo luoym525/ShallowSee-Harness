@@ -35,3 +35,10 @@ test('write guards follow canonical paths and Windows case aliases',async t=>{
  try{await fs.lstat(link);await rejectBoth('alias/seed.txt');assert.match(await executeTool(ws,'write_file',{path:'alias/new.txt',content:'bad'},guard),/^ERROR command_not_allowed:/);}catch(e){if(e.code!=='ENOENT')throw e;}
  assert.equal(await ws.readFile('acceptance/seed.txt'),'original');assert.match(await executeTool(ws,'write_file',{path:'ordinary.txt',content:'original'},guard),/^Wrote/);assert.match(await executeTool(ws,'edit_file',{path:'ordinary.txt',old_text:'original',new_text:'changed'},guard),/^Edited/);assert.equal(await ws.readFile('ordinary.txt'),'changed');
 });
+test('git status is read-only and reports tracked and untracked paths',async t=>{
+ const {dir,ws}=await setup(t);await ws.writeFile('tracked file.txt','original');await ws.git.commit('initial');const gitDir=path.join(dir,'workspace.git');const initialHead=await ws.git.head();const indexPath=path.join(gitDir,'index');const indexBefore=await fs.readFile(indexPath);const marker=path.join(dir,'status-hook-ran');const hook=path.join(gitDir,'hooks','pre-commit');await fs.writeFile(hook,`#!/bin/sh\necho ran > "${marker.replaceAll('\\','/')}"\nexit 1\n`);await fs.chmod(hook,0o755);
+ assert.deepEqual(await ws.git.status(),{clean:true,changed:[]});
+ await ws.writeFile('tracked file.txt','changed');let status=await ws.git.status();assert.equal(status.clean,false);assert.deepEqual(status.changed,['tracked file.txt']);
+ await ws.writeFile('new file.txt','untracked');status=await ws.git.status();assert.equal(status.clean,false);assert.deepEqual(new Set(status.changed),new Set(['tracked file.txt','new file.txt']));
+ assert.equal(await ws.git.head(),initialHead);assert.deepEqual(await fs.readFile(indexPath),indexBefore);await assert.rejects(fs.access(marker),{code:'ENOENT'});
+});
