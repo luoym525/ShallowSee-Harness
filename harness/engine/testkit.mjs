@@ -34,7 +34,7 @@ export function fakeRouter(calls = []) {
     calls.push(structuredClone({ ...req }));
     const avoid = new Set(req.avoidModels ?? []);
     const pick = (refs, why, extra = {}) => {
-      const usable = refs.filter(r => byRef.has(r) && !avoid.has(r));
+      const usable = [...new Set(refs)].filter(r => byRef.has(r) && !avoid.has(r));
       if (!usable.length) throw Object.assign(new Error('no model matches'), { code: 'no_match' });
       const diverse = (req.avoidVendors?.length ? usable.filter(r => !req.avoidVendors.includes(byRef.get(r).vendor)) : []);
       const ordered = diverse.length ? [...diverse, ...usable.filter(r => !diverse.includes(r))] : usable;
@@ -250,7 +250,7 @@ export async function makeKit(opts = {}) {
       await o.llm({ messages: [{ role: 'user', content: `build ${o.item.id}` }] });
       if (opts.blockBuilder) await opts.blockBuilder(o);
       o.onTool?.({ phase: 'call', name: 'write_file', summary: 'path ' + o.item.id });
-      const files = (opts.builder ?? ((item) => ({ [`${item.id}.txt`]: 'ok' })))(o.item, o.attempt, o);
+      const files = await (opts.builder ?? ((item) => ({ [`${item.id}.txt`]: 'ok' })))(o.item, o.attempt, o);
       for (const [path, content] of Object.entries(files)) await o.workspace.writeFile(path, content);
       o.onTool?.({ phase: 'result', name: 'write_file', summary: 'written', status: 'ok', durationMs: 1 });
       guard.self++;
@@ -304,6 +304,7 @@ export async function makeKit(opts = {}) {
   const deps = {
     modelClient, searchClient, router, roles, sandbox, builder, tester, createEventLog,
     skills: opts.skills === undefined ? SKILLS : opts.skills, now: opts.now ?? Date.now,
+    ...(opts.depsOverride ?? {}),
   };
   return { deps, config, dataDir, modelClient, searchClient, routerCalls, order, violations, seen, guard, cleanup: () => rm(dataDir, { recursive: true, force: true }).catch(() => {}) };
 }

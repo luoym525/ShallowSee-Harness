@@ -336,7 +336,9 @@ class Run {
   }
 
   binding(role, decision, { purpose, attempt = 1, taskId, pinnedModel } = {}) {
-    const models = pinnedModel ? [pinnedModel] : [decision.model, ...(Array.isArray(decision.fallbacks) ? decision.fallbacks : [])];
+    // Primary first, then the router's fallbacks in order; a repeated model is never retried.
+    const models = pinnedModel ? [pinnedModel]
+      : [...new Set([decision.model, ...(Array.isArray(decision.fallbacks) ? decision.fallbacks : [])])].filter(m => typeof m === 'string' && m);
     return { role, decision, purpose, attempt, taskId, models, active: 0, pinned: Boolean(pinnedModel), pinnedFailed: false,
       lastCallId: null, reservedCallId: null };
   }
