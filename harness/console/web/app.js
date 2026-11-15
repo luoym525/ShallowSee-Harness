@@ -7,9 +7,11 @@ import { h, clear, icon } from "./ui/dom.mjs";
 import { mountWish, mountRuns } from "./ui/wish.mjs";
 import { mountRun } from "./ui/run.mjs";
 import { mountSetup, mountProviderForm, mountRouting } from "./ui/setup.mjs";
+import { createNavigator } from "./ui/nav.mjs";
 
 const app = document.getElementById("app");
 const conn = document.getElementById("connection");
+const navigator_ = createNavigator();
 let current = null;
 
 export function navigate(hash) {
@@ -51,22 +53,27 @@ async function route() {
   }
   if (current && current.api && current.api.unmount) current.api.unmount();
   current = null;
+  // One ticket per navigation: starting a new one aborts the previous page's pending fetches and marks it stale.
+  // Every page also gets its own fresh root, so a load that still finishes late can only write into a detached element.
+  const ticket = navigator_.begin();
+  const root = h("div", { class: "route-root" });
+  app.replaceChildren(root);
   window.scrollTo(0, 0);
 
   if (a === "runs" && b && /^hr-\d{8}-\d{6}-[a-z0-9]{4}$/.test(b)) {
     setNav("runs");
-    const api = mountRun(app, b, { tab: c === "report" ? "report" : c === "files" ? "files" : "run", setConnection });
+    const api = mountRun(root, b, { tab: c === "report" ? "report" : c === "files" ? "files" : "run", setConnection });
     current = { kind: "run", id: b, api };
     document.title = "Run · ShallowSee Autopilot";
     return;
   }
-  if (a === "runs") { setNav("runs"); document.title = "Runs · ShallowSee Autopilot"; await mountRuns(app); return; }
-  if (a === "setup" && b) { setNav("setup"); document.title = "Provider · ShallowSee Autopilot"; await mountProviderForm(app, b === "new" ? null : b, { navigate }); return; }
-  if (a === "setup") { setNav("setup"); document.title = "Setup · ShallowSee Autopilot"; await mountSetup(app, { navigate }); return; }
-  if (a === "routing") { setNav("setup"); document.title = "Routing & budget · ShallowSee Autopilot"; await mountRouting(app, { navigate }); return; }
-  if (!a || a === "new") { setNav("new"); document.title = "Make a wish · ShallowSee Autopilot"; await mountWish(app, { navigate }); return; }
+  if (a === "runs") { setNav("runs"); document.title = "Runs · ShallowSee Autopilot"; await mountRuns(root, { ticket }); return; }
+  if (a === "setup" && b) { setNav("setup"); document.title = "Provider · ShallowSee Autopilot"; await mountProviderForm(root, b === "new" ? null : b, { navigate, ticket }); return; }
+  if (a === "setup") { setNav("setup"); document.title = "Setup · ShallowSee Autopilot"; await mountSetup(root, { navigate, ticket }); return; }
+  if (a === "routing") { setNav("setup"); document.title = "Routing & budget · ShallowSee Autopilot"; await mountRouting(root, { navigate, ticket }); return; }
+  if (!a || a === "new") { setNav("new"); document.title = "Make a wish · ShallowSee Autopilot"; await mountWish(root, { navigate, ticket }); return; }
   setNav("");
-  clear(app).append(h("div", { class: "page-narrow" }, h("div", { class: "card empty-card" }, h("h2", null, "That page doesn't exist"), h("a", { class: "btn primary", href: "#/new" }, "Make a wish"))));
+  root.append(h("div", { class: "page-narrow" }, h("div", { class: "card empty-card" }, h("h2", null, "That page doesn't exist"), h("a", { class: "btn primary", href: "#/new" }, "Make a wish"))));
 }
 
 // ---- theme: light by default; "system" follows the OS; the choice is remembered when storage allows

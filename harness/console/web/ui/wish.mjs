@@ -11,9 +11,10 @@ const EXAMPLES = [
   "A web page with a countdown to my next birthday, with a different colour each month",
 ];
 
-export async function mountWish(root, { navigate }) {
+export async function mountWish(root, { navigate, ticket }) {
   clear(root).append(h("p", { class: "muted pad" }, "Loading…"));
-  const [cfg, presets] = await Promise.all([get("/api/config"), get("/api/presets")]);
+  const [cfg, presets] = await Promise.all([get("/api/config", { signal: ticket.signal }), get("/api/presets", { signal: ticket.signal })]);
+  if (!ticket.isCurrent()) return; // a newer page took over while this load was in flight
   const config = cfg.ok ? cfg.data.config : null;
   const ready = cfg.ok && hasUsableModels(config, presets.ok ? presets.data.presets : []);
   const budget = config?.budget || null;
@@ -72,9 +73,10 @@ export async function mountWish(root, { navigate }) {
   if (ready) area.focus();
 }
 
-export async function mountRuns(root) {
+export async function mountRuns(root, { ticket }) {
   clear(root).append(h("p", { class: "muted pad" }, "Loading runs…"));
-  const res = await get("/api/runs");
+  const res = await get("/api/runs", { signal: ticket.signal });
+  if (!ticket.isCurrent()) return;
   const page = h("div", { class: "page-narrow" }, h("div", { class: "page-head" }, h("h1", null, "Runs"), h("a", { class: "btn primary", href: "#/new" }, icon("plus", 15), h("span", null, "New wish"))));
   if (!res.ok) {
     page.append(h("div", { class: "card empty-card" }, h("h2", null, "Couldn't load the runs"), h("p", { class: "muted" }, res.error?.message || "")));

@@ -11,9 +11,10 @@ import { openFetchDialog, letterOf } from "./setup.mjs";
 const CAPABILITIES = ["reasoning", "coding", "vision", "tools", "json", "long_context"];
 const CAP_LABEL = { reasoning: "reasoning", coding: "coding", vision: "vision", tools: "tools", json: "json", long_context: "long context" };
 
-export async function mountProviderForm(root, id, { navigate }) {
+export async function mountProviderForm(root, id, { navigate, ticket }) {
   clear(root).append(h("p", { class: "muted pad" }, "Loading…"));
-  const [cfg, pre] = await Promise.all([get("/api/config"), get("/api/presets")]);
+  const [cfg, pre] = await Promise.all([get("/api/config", { signal: ticket.signal }), get("/api/presets", { signal: ticket.signal })]);
+  if (!ticket.isCurrent()) return;
   const editing = id !== null;
   const presets = orderPresets(pre.ok ? pre.data.presets || [] : []);
   const existing = cfg.ok && editing ? cfg.data.config.providers.find((p) => p.id === id) : null;
