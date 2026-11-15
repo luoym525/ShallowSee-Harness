@@ -1,0 +1,132 @@
+{
+  "scope": {
+    "kind": "all"
+  },
+  "candidate": "d81b0c3",
+  "results": [
+    {
+      "checkId": "A1",
+      "itemId": "W1",
+      "type": "file",
+      "status": "pass",
+      "evidence": {
+        "quotes": [
+          {
+            "file": "index.html",
+            "text": "<h1>Umbrella Check</h1>"
+          }
+        ]
+      },
+      "message": "index.html contains the title and an input",
+      "durationMs": 4
+    },
+    {
+      "checkId": "A2",
+      "itemId": "W1",
+      "type": "command",
+      "status": "pass",
+      "evidence": {
+        "command": [
+          "node",
+          "acceptance/a2-layout.test.mjs"
+        ],
+        "exitCode": 0,
+        "stdoutTail": "ok search form\nok result area\n"
+      },
+      "message": "exit code 0",
+      "durationMs": 182
+    },
+    {
+      "checkId": "A3",
+      "itemId": "W2",
+      "type": "command",
+      "status": "pass",
+      "evidence": {
+        "command": [
+          "node",
+          "acceptance/a3-forecast-url.test.mjs"
+        ],
+        "exitCode": 0,
+        "stdoutTail": "ok daily=precipitation_probability_max,precipitation_sum\nok timezone=auto\n"
+      },
+      "message": "exit code 0",
+      "durationMs": 171
+    },
+    {
+      "checkId": "A4",
+      "itemId": "W2",
+      "type": "command",
+      "status": "pass",
+      "evidence": {
+        "command": [
+          "node",
+          "acceptance/a4-verdict.test.mjs"
+        ],
+        "exitCode": 0,
+        "stdoutTail": "ok 60% rain → Take an umbrella\nok 10% and 0 mm → No umbrella needed\n"
+      },
+      "message": "exit code 0",
+      "durationMs": 166
+    },
+    {
+      "checkId": "A5",
+      "itemId": "W2",
+      "type": "llm_judge",
+      "status": "pass",
+      "evidence": {
+        "quotes": [
+          {
+            "file": "forecast.mjs",
+            "text": "Take an umbrella: ${pct}% chance of rain tomorrow"
+          }
+        ],
+        "judgeModel": "anthropic/claude-opus-5-5"
+      },
+      "message": "Plain wording; shows the chance of rain and the rule",
+      "durationMs": 2300
+    },
+    {
+      "checkId": "A6",
+      "itemId": "W3",
+      "type": "command",
+      "status": "pass",
+      "evidence": {
+        "command": [
+          "node",
+          "acceptance/a6-errors.test.mjs"
+        ],
+        "exitCode": 0,
+        "stdoutTail": "ok offline message\nok unknown city message\n"
+      },
+      "message": "exit code 0",
+      "durationMs": 158
+    },
+    {
+      "checkId": "A7",
+      "itemId": "W3",
+      "type": "file",
+      "status": "pass",
+      "evidence": {
+        "quotes": [
+          {
+            "file": "README.md",
+            "text": "## How to use"
+          }
+        ]
+      },
+      "message": "README.md contains 'How to use' and 'Open-Meteo'",
+      "durationMs": 3
+    }
+  ],
+  "summary": {
+    "total": 7,
+    "passed": 7,
+    "failed": 0,
+    "errored": 0,
+    "skipped": 0
+  },
+  "score": 1,
+  "acceptanceIntact": true,
+  "allPassed": true,
+  "testerModel": "anthropic/claude-opus-5-5"
+}

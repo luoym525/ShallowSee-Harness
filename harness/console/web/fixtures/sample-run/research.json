@@ -1,0 +1,91 @@
+{
+  "findings": [
+    {
+      "question": "Which free weather forecast API works from a browser without a key?",
+      "answer": "Open-Meteo offers a free forecast API for non-commercial use with no API key, callable from the browser.",
+      "sources": [
+        {
+          "name": "Terms | Open-Meteo",
+          "url": "https://open-meteo.com/en/terms",
+          "domain": "open-meteo.com",
+          "snippet": "Free for non-commercial use; no API key needed.",
+          "retrievedAt": "2026-11-15T01:31:14.000Z"
+        },
+        {
+          "name": "Weather Forecast API | Open-Meteo",
+          "url": "https://open-meteo.com/en/docs",
+          "domain": "open-meteo.com",
+          "snippet": "Daily variables include precipitation_probability_max and precipitation_sum; forecast_days sets how many days are returned.",
+          "retrievedAt": "2026-11-15T01:31:02.000Z"
+        }
+      ],
+      "confidence": "high",
+      "basis": "search"
+    },
+    {
+      "question": "How do I get tomorrow's chance of rain from it?",
+      "answer": "Ask for daily=precipitation_probability_max,precipitation_sum with timezone=auto and forecast_days=2; index 1 of the daily arrays is tomorrow.",
+      "sources": [
+        {
+          "name": "Weather Forecast API | Open-Meteo",
+          "url": "https://open-meteo.com/en/docs",
+          "domain": "open-meteo.com",
+          "snippet": "Daily variables include precipitation_probability_max and precipitation_sum; forecast_days sets how many days are returned.",
+          "retrievedAt": "2026-11-15T01:31:02.000Z"
+        }
+      ],
+      "confidence": "high",
+      "basis": "search"
+    },
+    {
+      "question": "How do I turn a city name into coordinates?",
+      "answer": "The Open-Meteo geocoding search endpoint takes a place name and returns latitude and longitude.",
+      "sources": [
+        {
+          "name": "Geocoding API | Open-Meteo",
+          "url": "https://open-meteo.com/en/docs/geocoding-api",
+          "domain": "open-meteo.com",
+          "snippet": "Search a place by name and get its latitude and longitude.",
+          "retrievedAt": "2026-11-15T01:31:09.000Z"
+        }
+      ],
+      "confidence": "high",
+      "basis": "search"
+    },
+    {
+      "question": "Can the page use the visitor's location?",
+      "answer": "navigator.geolocation asks the visitor for permission and only works in a secure context (https or localhost).",
+      "sources": [
+        {
+          "name": "Geolocation API | MDN",
+          "url": "https://developer.mozilla.org/en-US/docs/Web/API/Geolocation_API",
+          "domain": "developer.mozilla.org",
+          "snippet": "Available only in secure contexts; the browser asks the visitor for permission.",
+          "retrievedAt": "2026-11-15T01:31:20.000Z"
+        }
+      ],
+      "confidence": "high",
+      "basis": "search"
+    }
+  ],
+  "recommendedApproach": "A static page with a small pure module (forecast.mjs) that builds the request URLs, reads tomorrow's values and decides the verdict, so it can be tested with node. The page asks for the location first and falls back to a city search.",
+  "externalServices": [
+    {
+      "name": "Open-Meteo Forecast API",
+      "url": "https://api.open-meteo.com/v1/forecast",
+      "needsKey": false,
+      "notes": "Free for non-commercial use"
+    },
+    {
+      "name": "Open-Meteo Geocoding API",
+      "url": "https://geocoding-api.open-meteo.com/v1/search",
+      "needsKey": false,
+      "notes": "City name to coordinates"
+    }
+  ],
+  "risks": [
+    "The visitor may refuse location access",
+    "The forecast service may be unreachable"
+  ],
+  "searchesUsed": 3
+}
