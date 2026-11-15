@@ -27,3 +27,11 @@ test('trusted absolute scripts cannot escape frozen directory through symlinks',
 test('external Git hooks cannot run from the bare repository',async t=>{
  const {dir,ws}=await setup(t);const gitDir=path.join(dir,'workspace.git');assert.equal((await fs.stat(gitDir)).isDirectory(),true);const marker=path.join(dir,'hook-ran');const hook=path.join(gitDir,'hooks','pre-commit');await fs.writeFile(hook,`#!/bin/sh\necho ran > "${marker.replaceAll('\\','/')}"\nexit 1\n`);await fs.chmod(hook,0o755);await ws.writeFile('file','content');assert.ok(await ws.git.commit('hook check'));await assert.rejects(fs.access(marker),{code:'ENOENT'});
 });
+test('write guards follow canonical paths and Windows case aliases',async t=>{
+ const {ws}=await setup(t);await ws.writeFile('acceptance/seed.txt','original');const guard={denyPaths:['acceptance/']};
+ const rejectBoth=async rel=>{assert.match(await executeTool(ws,'write_file',{path:rel,content:'changed'},guard),/^ERROR command_not_allowed:/);assert.match(await executeTool(ws,'edit_file',{path:rel,old_text:'original',new_text:'changed'},guard),/^ERROR command_not_allowed:/);};
+ await rejectBoth('acceptance/seed.txt');if(process.platform==='win32'){await rejectBoth('ACCEPTANCE/seed.txt');assert.match(await executeTool(ws,'write_file',{path:'ACCEPTANCE/new.txt',content:'bad'},guard),/^ERROR command_not_allowed:/);}
+ const link=path.join(ws.dir,'alias');try{await fs.symlink(path.join(ws.dir,'acceptance'),link,process.platform==='win32'?'junction':'dir');}catch(e){if(['EPERM','EACCES','ENOSYS'].includes(e.code)){t.diagnostic('Directory links unavailable: '+e.code);}else throw e;}
+ try{await fs.lstat(link);await rejectBoth('alias/seed.txt');assert.match(await executeTool(ws,'write_file',{path:'alias/new.txt',content:'bad'},guard),/^ERROR command_not_allowed:/);}catch(e){if(e.code!=='ENOENT')throw e;}
+ assert.equal(await ws.readFile('acceptance/seed.txt'),'original');assert.match(await executeTool(ws,'write_file',{path:'ordinary.txt',content:'original'},guard),/^Wrote/);assert.match(await executeTool(ws,'edit_file',{path:'ordinary.txt',old_text:'original',new_text:'changed'},guard),/^Edited/);assert.equal(await ws.readFile('ordinary.txt'),'changed');
+});
