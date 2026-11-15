@@ -21,7 +21,7 @@ HTTP + SSE from the console server (brief 07). Until it exists, run your own tin
 ## Screens
 **1. Setup → Providers** (`#/setup`), modelled on CC Switch's provider list:
 - A card per provider: name, kind badge (Model / Search / GitHub), base URL, key status (`sk-…ab12` or "No key"), model count, Enabled toggle, **Test** (shows latency or the error inline), **Edit**, **Delete** (confirm dialog).
-- Header buttons **Add provider** and **Fetch models** (on each model provider).
+- Header buttons **Add provider** and **Fetch models** (on each model provider). Fetch is manual only. Show distinct, plain-English results for "Key rejected (401/403)", "This provider has no model list endpoint", "The list is empty" and "Couldn't reach the provider"; on failure keep the models already configured; mark models whose tier was guessed from the catalog (`catalogMatched: false`) as "Estimated tier" (room #269).
 
 **2. Setup → Add / Edit provider** (`#/setup/new`, `#/setup/:id`): the screenshot Bill shared, in English:
 - Back arrow + title **"Add provider"** · a large letter avatar.

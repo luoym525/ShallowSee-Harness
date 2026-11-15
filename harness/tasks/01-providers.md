@@ -52,7 +52,7 @@ Model selection (Bill's module 2) only works if every model, whatever its vendor
 
 **Utilities**
 - `testProvider`: anthropic → `GET {baseUrl}/v1/models` (fallback: 1-token completion with the first enabled model); openai_compatible → `GET {baseUrl}/models`; linkup → a tiny search `"current UTC date"` with depth standard; github → `GET /user`. Return `ok`, latency and a short redacted `detail` ("Connected. 4 models available." / "Key rejected (401).").
-- `fetchRemoteModels`: model ids from the list endpoint, sorted.
+- `fetchRemoteModels`: model ids from the list endpoint, sorted. Only ever called on demand (the Setup page's button or `testProvider`), never in the background or during a run. Errors are distinguishable and redacted: `auth` (401/403), `not_found`/unsupported (404, i.e. no list endpoint), `server`/`network`, `invalid_response`; an empty list is a valid result, not an error. A failed fetch never changes the stored `models` (room #269). Test all of these against a mocked official list endpoint.
 - `validateJson`: the subset listed in interfaces.md, with readable error paths (`$.workItems[2].id: required`).
 
 ## Method notes (why it's built this way)
