@@ -117,6 +117,7 @@ test('plan_check: a two-source stale fact forces a revision with the correction,
   assert.ok(!facts2.includes('10,000'));
   assert.equal((await readJson(kit.dataDir, runId, 'plan-check-v2.json')).findings[0].verdict, 'fresh');
   assert.equal((await readJson(kit.dataDir, runId, 'plan-review.json')).specVersion, 2);
+  assert.deepEqual(ofType(events, 'harness.skill.completed').filter(e => e.payload.phase === 'plan_check').map(e => e.payload.reportPath), ['plan-check-v1.json', 'plan-check-v2.json']);
   // The plan-check approval is bound to spec v2 only.
   assert.equal((await readRun(runId, { dataDir: kit.dataDir })).approval.specVersion, 2);
   validate(kit.dataDir, runId);
