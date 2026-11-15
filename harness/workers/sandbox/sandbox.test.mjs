@@ -5,3 +5,25 @@ test('paths, git hooks, and frozen read only',async t=>{const {dir,ws}=await set
 test('timeout and abort wait for close',async t=>{const {ws}=await setup(t);await ws.writeFile('hang.mjs','setInterval(()=>{},1000)');let r=await ws.exec('node',['hang.mjs'],{timeoutMs:300});assert.equal(r.timedOut,true);const c=new AbortController();setTimeout(()=>c.abort(),300);r=await ws.exec('node',['hang.mjs'],{signal:c.signal});assert.equal(r.cancelled,true);});
 test('probe fails closed and test runner uses in-process isolation',async t=>{const fake=await sandboxSupport({probe:async()=>({stdout:'OPEN'})});assert.equal(fake.ok,false);const {ws}=await setup(t);await ws.writeFile('sample.test.mjs',`import {test} from 'node:test';test('works',()=>{});`);const support=await sandboxSupport();assert.ok(support.testIsolationFlag);const r=await ws.exec('node',['--test','sample.test.mjs']);assert.equal(r.exitCode,0,r.stderr);});
 test('denyPaths cannot be bypassed with dot segments',async t=>{const {ws}=await setup(t);assert.match(await executeTool(ws,'write_file',{path:'./acceptance/x',content:'x'},{denyPaths:['acceptance/']}),/^ERROR/);await assert.rejects(ws.exec('node',['--allow-fs-read=*','--allow-fs-write=*','--allow-child-process','app.mjs']),{code:'command_not_allowed'});});
+test('all permission options are rejected through workspace and model tools',async t=>{
+ const {ws}=await setup(t);
+ await ws.writeFile('safe.mjs','console.log("safe")');
+ for(const option of ['--allow-fs-read=*','--allow-fs-write=*','--allow-child-process','--allow-worker']) {
+  for(const args of [[option,'safe.mjs'],['--test',option,'safe.mjs']]) {
+   await assert.rejects(ws.exec('node',args),{code:'command_not_allowed'});
+   assert.match(await executeTool(ws,'run_command',{args}),/^ERROR command_not_allowed:/);
+  }
+ }
+});
+test('trusted absolute scripts cannot escape frozen directory through symlinks',async t=>{
+ const {dir,ws}=await setup(t);const frozen=path.join(dir,'frozen');const external=path.join(dir,'outside.mjs');await fs.mkdir(frozen);await fs.writeFile(external,'console.log("outside")');const trusted=path.join(frozen,'ok.mjs');await fs.writeFile(trusted,'console.log("trusted")');
+ assert.match((await ws.exec('node',[trusted],{readOnlyPaths:[frozen]})).stdout,/trusted/);
+ await assert.rejects(ws.exec('node',[external],{readOnlyPaths:[frozen]}),{code:'path_escape'});
+ assert.match(await executeTool(ws,'run_command',{args:[trusted],readOnlyPaths:[frozen]}),/^ERROR path_escape:/);
+ const outsideDir=path.join(dir,'external');await fs.mkdir(outsideDir);await fs.writeFile(path.join(outsideDir,'escape.mjs'),'console.log("escaped")');const link=path.join(frozen,'escape-dir');try{await fs.symlink(outsideDir,link,process.platform==='win32'?'junction':'dir');}catch(e){if(['EPERM','EACCES','ENOSYS'].includes(e.code)){t.diagnostic('Directory links unavailable: '+e.code);return;}throw e;}
+ const escaped=path.join(link,'escape.mjs');await assert.rejects(ws.exec('node',[escaped],{readOnlyPaths:[frozen]}),{code:'path_escape'});
+ await assert.rejects(ws.exec('node',['--test',escaped],{readOnlyPaths:[frozen]}),{code:'path_escape'});
+});
+test('external Git hooks cannot run from the bare repository',async t=>{
+ const {dir,ws}=await setup(t);const gitDir=path.join(dir,'workspace.git');assert.equal((await fs.stat(gitDir)).isDirectory(),true);const marker=path.join(dir,'hook-ran');const hook=path.join(gitDir,'hooks','pre-commit');await fs.writeFile(hook,`#!/bin/sh\necho ran > "${marker.replaceAll('\\','/')}"\nexit 1\n`);await fs.chmod(hook,0o755);await ws.writeFile('file','content');assert.ok(await ws.git.commit('hook check'));await assert.rejects(fs.access(marker),{code:'ENOENT'});
+});
