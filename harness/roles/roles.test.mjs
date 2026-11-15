@@ -31,7 +31,8 @@ const spec = {
     { id: 'W2', title: 'Usage instructions', description: 'Explain usage.', difficulty: 'easy', suggestedModel: 'wrong/model',
       modelReason: 'Unknown model', dependsOn: ['W1'], files: ['README.md'], checkIds: ['A2'] },
   ],
-  acceptance: [command, { id: 'A2', itemId: 'W2', description: 'Explain flags', type: 'file', path: 'README.md', mustContain: ['--help'] }],
+  acceptance: [command, { id: 'A2', itemId: 'W2', description: 'Explain how to run the CLI and use its flags', type: 'file',
+    path: 'README.md', mustContain: ['node tip.mjs', '--help'] }],
 };
 const plan = { verdict: 'approve', scores: { coversWish: 3, feasible: 3, testable: 3, scoped: 3 }, issues: [], requiredChanges: [] };
 const final = { verdict: 'ship', scores: { meetsWish: 3, works: 2, quality: 2 }, gaps: [], iterateItems: [] };
@@ -212,19 +213,46 @@ test('spec rejects sandbox command escapes, generated paths, and non-local HTTP 
   broken.entry.run = ['node', '--eval', 'test'];
   broken.acceptance[0].run = ['node', '../escape.mjs'];
   broken.acceptance[0].generate = true;
-  broken.acceptance[1] = { id: 'A2', itemId: 'W2', type: 'http', description: 'Check response',
+  const httpCheck = { id: 'A3', itemId: 'W2', type: 'http', description: 'Check response',
     start: ['node', 'server.mjs'], port: 4400, request: { method: 'GET', path: '//remote.test' }, expectStatus: 200 };
+  broken.workItems[1].checkIds.push(httpCheck.id);
+  broken.acceptance.push(httpCheck);
   const issues = checkSpecRules(broken).join('\n');
   assert.match(issues, /node entry/);
   assert.match(issues, /workspace-relative .mjs/);
   assert.match(issues, /local request path/);
   broken.acceptance[0].run = ['node', 'escape.mjs'];
   assert.ok(checkSpecRules(broken).some(issue => issue.includes('Place generated scripts under acceptance/')));
-  broken.acceptance[1].port = 4499;
-  broken.acceptance[1].request.path = '/forecast?units=metric';
+  httpCheck.port = 4499;
+  httpCheck.request.path = '/forecast?units=metric';
   broken.entry.run = ['node', 'tip.mjs', '--help'];
   broken.acceptance[0].run = ['node', 'acceptance/tip.mjs'];
   assert.deepEqual(checkSpecRules(broken), []);
+});
+
+test('the plan must assign the root README to a work item with a content check for its actual entry', () => {
+  const missing = structuredClone(spec);
+  missing.workItems[1].files = ['docs/README.md'];
+  assert.match(checkSpecRules(missing).join('\n'), /lists the root README\.md/);
+
+  const unchecked = structuredClone(spec);
+  delete unchecked.acceptance[1].mustContain;
+  unchecked.acceptance[1].mustMatch = '.*';
+  assert.match(checkSpecRules(unchecked).join('\n'), /file check for.*node tip\.mjs/);
+  unchecked.acceptance[1].mustContain = ['node unrelated.mjs'];
+  assert.match(checkSpecRules(unchecked).join('\n'), /file check for.*node tip\.mjs/);
+  unchecked.acceptance[1].mustContain = ['node tip.mjs'];
+  assert.deepEqual(checkSpecRules(unchecked), []);
+
+  const otherOwner = structuredClone(spec);
+  otherOwner.acceptance[1].itemId = 'W1';
+  assert.match(checkSpecRules(otherOwner).join('\n'), /README\.md work item must have a file check/);
+
+  const web = structuredClone(spec);
+  web.stack = 'static-web';
+  web.entry = { kind: 'open_html', path: 'public/index.html' };
+  web.acceptance[1].mustContain = [web.entry.path];
+  assert.deepEqual(checkSpecRules(web), []);
 });
 
 test('reviewer uses separated input and rejects an iteration naming an unknown work item', async () => {
