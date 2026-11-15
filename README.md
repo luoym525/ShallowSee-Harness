@@ -77,6 +77,8 @@ An earlier attempt the same morning failed at planning because the planner's out
 
 ## Quick start
 
+**Windows one-click app:** [`release/ShallowSee.exe`](release/ShallowSee.exe) (34 MB) bundles Node.js and this repo at `97f2aaf`. Double-click it: it unpacks itself, starts the console and opens http://127.0.0.1:4320. Add your API keys on the Setup page (they are stored in `%APPDATA%ShallowSeepiConfig.json`, never in the exe). Requires Git for Windows. Self-tested on Windows 11.
+
 1. Node.js 20 or later. Nothing to install: zero dependencies.
 2. `cp apiConfig.example.json apiConfig.json` and paste your Anthropic and Linkup keys (git ignores the file), or add providers on the console's Setup page.
 3. `node harness/bin/shallowsee.mjs config check` shows which model each role gets, and tests each key.
