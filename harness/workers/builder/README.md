@@ -1,0 +1,1 @@
+`buildItem` runs a bounded model/tool loop for one work item, denies tool writes to acceptance/, and commits changes after completion, failure, or cancellation. The caller supplies the routed `llm`, workspace, and abort signal. Tool events contain summaries rather than file contents.
