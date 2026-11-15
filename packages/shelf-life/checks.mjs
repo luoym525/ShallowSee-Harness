@@ -76,7 +76,9 @@ export function cleanSources(raw) {
     const snippet = compact(s.snippet, 1100);
     if (!snippet) continue;
     seen.add(url.href);
-    result.push({ name: compact(s.name, 160) || host, url: url.href, domain: host.replace(/^www\./u, ''), snippet });
+    const retrievedAt = typeof s.retrievedAt === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u.test(s.retrievedAt) &&
+      Number.isFinite(Date.parse(s.retrievedAt)) ? { retrievedAt: s.retrievedAt } : {};
+    result.push({ name: compact(s.name, 160) || host, url: url.href, domain: host.replace(/^www\./u, ''), snippet, ...retrievedAt });
   }
   return result;
 }
