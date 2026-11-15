@@ -12,7 +12,7 @@ Package the existing Shelf Life audit (extract time-sensitive claims from a Mark
 `harness/AGENTS.md` · `harness/contracts/interfaces.md` §10 (**your contract**) and §1 (CompletionRequest/Result, SearchClient) · `harness/contracts/artifacts.md` "fact-check.json" · `harness/contracts/events.md` (skill events, `shelflife.*` passthrough) · `docs/CONTRACT.md` (`shelflife.*` payloads) · `packages/shelf-life/{runner,checks,providers}.mjs` and `docs/DIRECT.md`.
 
 ## Inputs
-`ShelfLifeInput` `{ doc: { label, markdown }, maxClaims }` and a `SkillContext` from the engine: `llm` (already routed; neutral CompletionRequest with `responseSchema`, interfaces.md §1), `search` (Linkup through the harness's search client), `providerIdentity` (trusted provider and model for the events), `childRoom` (`{ rootDir, roomId: "<runId>-fact-check", parentRoomId }`: your own event log), `note`, `signal`, `now`.
+`ShelfLifeInput` `{ doc: { label, markdown }, maxClaims }` and a `SkillContext` from the engine: `llm` (already routed; neutral CompletionRequest with `responseSchema`, interfaces.md §1), `search` (Linkup through the harness's search client), `providerIdentity` (trusted provider and model for the events), `childRoom` (`{ rootDir, roomId: "<runId>-sl-NN", parentRoomId }`: your own event log, unique per invocation), `note`, `signal`, `now`.
 
 ## Outputs
 - `harness/skills/index.mjs` exporting `SKILLS = { "shelf-life": shelfLife }`.
