@@ -24,10 +24,10 @@ Run folders `data/harness/runs/<runId>/` and logs `data/rooms/<runId>/events.jso
 7. `harness/docs/demo/QA-PREP.md`: likely judge questions with crisp answers (why separate tester, how routing decides, what stops infinite loops, cost control, what fails today, how it differs from Claude Code or Codex alone).
 
 ## Testing
-`node --test harness/eval/` for `score.mjs` against a small synthetic run folder (labelled synthetic) and its held-out checks.
+`node --test "harness/eval/**/*.test.mjs"` for `score.mjs` against a small synthetic run folder (labelled synthetic) and its held-out checks.
 
 ## Definition of Done (two phases)
-- [ ] Phase 1 (now): wishes.json, run-bench.mjs, score.mjs plus tests, README draft, VIDEO-SCRIPT draft with blanks, QA-PREP; `node --test harness/eval/` passes; branch pushed; SHA reported.
+- [ ] Phase 1 (now): wishes.json, run-bench.mjs, score.mjs plus tests, README draft, VIDEO-SCRIPT draft with blanks, QA-PREP; `node --test "harness/eval/**/*.test.mjs"` passes; branch pushed; SHA reported.
 - [ ] Phase 2 (after integration, with the PM): run the bench with real keys; REPORT.md from real runs; fill the video blanks with real numbers; push and report the new SHA.
 
 ## Out of scope

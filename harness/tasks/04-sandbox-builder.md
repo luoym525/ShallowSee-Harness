@@ -42,7 +42,7 @@ Real temp directories and real git (git is installed). Path-escape table tests (
 
 ## Definition of Done
 - [ ] Exports match interfaces.md §4–5.
-- [ ] `node --test harness/workers/sandbox/ harness/workers/builder/` passes offline on Windows (paste the summary).
+- [ ] `node --test "harness/workers/sandbox/**/*.test.mjs" "harness/workers/builder/**/*.test.mjs"` passes offline on Windows (paste the summary).
 - [ ] A test proves keys in the parent environment never reach child processes.
 - [ ] The four `run_command` counter-examples pass (paste the output), and `sandboxSupport()` fails closed when the probe isn't blocked (test with an injected fake).
 - [ ] If keys are available: `node harness/workers/builder/live-demo.mjs` makes Claude Haiku 5.5 build a tiny item (e.g. "a CLI that prints the 7-times table") in a temp workspace and commit it (paste the commit and file list). Otherwise "not run live".

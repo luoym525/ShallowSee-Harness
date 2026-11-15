@@ -56,11 +56,11 @@ Dark theme by default, like the screenshot: near-black background, soft card bor
 SSE reconnect with `Last-Event-ID`; tolerate unknown event types; never render HTML from data (`textContent` everywhere except the escaped Markdown renderer); never log or display keys (the server never sends them anyway).
 
 ## Testing
-`node --test harness/console/web/` for `model.mjs`: the fixture → expected view state (phase, items, current model and reason, spend, approval label, finished state), unknown events ignored, partial streams. Manual check: run the mock server, click through every screen, and take screenshots for the hand-back report (save them under `harness/console/web/screenshots/`).
+`node --test "harness/console/web/**/*.test.mjs"` for `model.mjs`: the fixture → expected view state (phase, items, current model and reason, spend, approval label, finished state), unknown events ignored, partial streams. Manual check: run the mock server, click through every screen, and take screenshots for the hand-back report (save them under `harness/console/web/screenshots/`).
 
 ## Definition of Done
 - [ ] All six screens work against the mock server; English everywhere.
-- [ ] `node --test harness/console/web/` passes (paste the summary).
+- [ ] `node --test "harness/console/web/**/*.test.mjs"` passes (paste the summary).
 - [ ] The synthetic fixture is clearly labelled in the UI.
 - [ ] Screenshots of Setup (list), Add provider, Routing, Make a wish, Live run (mid-run), Result.
 - [ ] Hand-back report; branch pushed; SHA reported.

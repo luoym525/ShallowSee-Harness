@@ -43,7 +43,7 @@ A complete fake `deps` (scripted roles, fake builder writing files into a real t
 
 ## Definition of Done
 - [ ] Exports match interfaces.md §7; artifacts and events match the contracts.
-- [ ] `node --test harness/engine/` passes offline (paste the summary); the event log of the happy path passes `samples/validate-events.mjs`.
+- [ ] `node --test "harness/engine/**/*.test.mjs"` passes offline (paste the summary); the event log of the happy path passes `samples/validate-events.mjs`.
 - [ ] `node harness/bin/shallowsee.mjs config check` works with no `apiConfig.json` (helpful message) and with one.
 - [ ] Integration (after the other branches merge, together with the PM): `node harness/bin/shallowsee.mjs run "I want a page that tells me if I need an umbrella in London tomorrow"` completes with real models. Paste the summary line, or say exactly where it stopped.
 - [ ] Hand-back report; branch pushed; SHA reported.

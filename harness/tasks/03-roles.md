@@ -46,7 +46,7 @@ A fake `ctx.llm` that returns canned JSON per role (valid, invalid-then-valid to
 
 ## Definition of Done
 - [ ] Exports match interfaces.md §3; `SCHEMAS` match artifacts.md.
-- [ ] `node --test harness/roles/` passes offline (paste the summary).
+- [ ] `node --test "harness/roles/**/*.test.mjs"` passes offline (paste the summary).
 - [ ] `checkSpecRules(spec)` exported and tested.
 - [ ] If keys are available: `node harness/roles/live-demo.mjs "I want a page that tells me if I need an umbrella in London tomorrow"` runs intake → research → plan → reviewPlan with real models and writes the four JSON files to a temp folder (paste titles and the review verdict). Otherwise "not run live".
 - [ ] Hand-back report; branch pushed; SHA reported.

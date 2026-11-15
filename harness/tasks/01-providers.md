@@ -64,7 +64,7 @@ Inject `fetchImpl` fakes that record requests and return canned responses. Cover
 
 ## Definition of Done
 - [ ] Every export in interfaces.md §1 exists with that shape.
-- [ ] `node --test harness/providers/` passes offline (paste the summary line).
+- [ ] `node --test "harness/providers/**/*.test.mjs"` passes offline (paste the summary line).
 - [ ] No key substring in any test output, error or redacted view (test proves it).
 - [ ] `live-check.mjs` runs and prints SKIPPED cleanly with no `apiConfig.json`.
 - [ ] If Bill has put keys in `apiConfig.json` on your machine: one real Anthropic completion and one Linkup search succeed (paste redacted output). Otherwise say "not run live".

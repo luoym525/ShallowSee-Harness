@@ -69,7 +69,7 @@ Table-driven tests: planner suggestion accepted, rejected (not configured, missi
 
 ## Definition of Done
 - [ ] Exports match interfaces.md §2; no I/O anywhere in the module.
-- [ ] `node --test harness/router/` passes (paste the summary).
+- [ ] `node --test "harness/router/**/*.test.mjs"` passes (paste the summary).
 - [ ] README has the final policy table and 5 example decisions produced by your code (paste real output).
 - [ ] Hand-back report; branch pushed; SHA reported.
 

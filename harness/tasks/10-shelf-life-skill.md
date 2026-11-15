@@ -37,7 +37,7 @@ Fake `llm` and `search` scripted like the existing `packages/shelf-life/direct.t
 
 ## Definition of Done
 - [ ] Exports match interfaces.md §10; output matches artifacts.md `fact-check.json`.
-- [ ] `node --test harness/skills/` and the existing `packages/shelf-life` tests pass offline (paste summaries).
+- [ ] `node --test "harness/skills/**/*.test.mjs"` and the existing `packages/shelf-life` tests pass offline (paste summaries).
 - [ ] No publish or push path is reachable from the skill (a test proves it).
 - [ ] Hand-back report; branch pushed; exact SHA announced in the room.
 

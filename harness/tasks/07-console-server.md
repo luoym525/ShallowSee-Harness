@@ -36,7 +36,7 @@ Serve the English web console: the CC Switch-style provider setup (reading and w
 Start the server on port 0 in tests with injected fake providers, router and engine and a temp `dataDir` holding a prepared synthetic run (`synthetic: true` in its `room.created`). Test every endpoint's happy path and main errors, Host/Origin rejection, key redaction, SSE resume with `Last-Event-ID` while lines are appended, preview path escapes, **a page served from the 4321 preview origin cannot use the 4320 API** (a POST with `Origin: http://127.0.0.1:4321` is rejected; the 4320 responses carry no `Access-Control-Allow-Origin`), the preview listener exposes no `/api`, and cancel and confirm routing to the handle.
 
 ## Definition of Done
-- [ ] Every endpoint in http-api.md implemented; `node --test harness/console/server/` passes offline (paste the summary).
+- [ ] Every endpoint in http-api.md implemented; `node --test "harness/console/server/**/*.test.mjs"` passes offline (paste the summary).
 - [ ] Test proves no API key appears in any response.
 - [ ] `node harness/console/server/index.mjs` serves the web folder (or a placeholder page if brief 08 hasn't merged yet).
 - [ ] Hand-back report; branch pushed; SHA reported.

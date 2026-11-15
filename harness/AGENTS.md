@@ -44,7 +44,7 @@ Three core modules (Bill's words):
 4. **Keys never leave `apiConfig.json`.** Not in events, logs, errors, test fixtures, screenshots, commits or HTTP responses. Errors are redacted. The sandbox gets no keys in its environment.
 5. **Unknown is `null`, never `0` or a guess** (tokens, cost, durations). Estimates are labelled `"estimated"`.
 6. **Never present synthetic output as real.** Fixtures are labelled `synthetic: true`. Demo numbers come from real runs only.
-7. **Tests:** `node --test harness/<your-folder>/` must pass offline with no keys and no network. Live checks go in a separate script that skips cleanly when no key is configured.
+7. **Tests:** `node --test "harness/<your-folder>/**/*.test.mjs"` (quote the glob; on Node 22 a bare folder path does not run its tests) must pass offline with no keys and no network. Live checks go in a separate script that skips cleanly when no key is configured.
 8. **Contract change needed?** Don't edit `contracts/`. Write the request in your hand-back report under "Contract requests" and tell Bill; the PM session decides and re-issues the contract.
 
 ## Conventions

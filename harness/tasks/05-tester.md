@@ -39,7 +39,7 @@ Real temp workspaces with tiny hand-written products: a passing and a failing CL
 
 ## Definition of Done
 - [ ] Exports match interfaces.md §6; TestReport matches artifacts.md.
-- [ ] `node --test harness/workers/tester/` passes offline on Windows (paste the summary).
+- [ ] `node --test "harness/workers/tester/**/*.test.mjs"` passes offline on Windows (paste the summary).
 - [ ] Tests prove: unsupported judge passes are downgraded; tampering fails everything; servers are always stopped.
 - [ ] If keys are available: a live run generates acceptance tests for a 2-item sample spec with Claude Sonnet 5.5 and runs them against a hand-written product (paste the summary). Otherwise "not run live".
 - [ ] Hand-back report; branch pushed; SHA reported.
