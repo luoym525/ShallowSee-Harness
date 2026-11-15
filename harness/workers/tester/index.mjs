@@ -175,6 +175,11 @@ export async function runChecks({ spec, workspace, scope, judge, acceptanceTree,
       }
       return report(scope, null, checks.map(c => result(c, 'fail', 'acceptance tests were modified')), false, null);
     }
+    if (candidate) {
+      const afterHead = await workspace.git.head();
+      const dirty = await git(workspace, ['--work-tree=' + workspace.dir, 'status', '--porcelain', '--untracked-files=all']);
+      if (afterHead !== candidate || dirty.trim()) candidate = null;
+    }
     return report(scope, candidate, results, true, results.find(r => r.evidence.judgeModel)?.evidence.judgeModel ?? null);
   } finally { if (frozen) await fs.rm(frozen, { recursive: true, force: true }); }
 }

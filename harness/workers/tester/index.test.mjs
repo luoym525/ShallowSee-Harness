@@ -64,3 +64,27 @@ test('direct command tampering fails every check, restores scaffold, and permits
   assert.equal(passed.acceptanceIntact, true);
   assert.equal(passed.allPassed, true);
 });
+test('product mutation during a passing command cannot be attributed to the original commit', async t => {
+  const ws = await fixture(t);
+  await ws.writeFile('product.txt', 'before');
+  await ws.writeFile('mutate.mjs', "import fs from 'node:fs'; fs.writeFileSync('product.txt', 'after'); console.log('ok');");
+  const original = await ws.git.commit('candidate');
+  const spec = {...base, acceptance:[{id:'M',itemId:'W1',type:'command',run:['node','mutate.mjs'],generate:false,expectExitCode:0,expectStdoutIncludes:['ok']}]};
+  const report = await runChecks(opts(ws,spec,{commit:original,acceptanceTree:null}));
+  assert.equal(report.results[0].status, 'pass');
+  assert.equal(report.acceptanceIntact, true);
+  assert.equal(report.candidate, null);
+  assert.equal(report.allPassed, true); // The engine must additionally require a bound candidate for delivery.
+  assert.equal(await ws.readFile('product.txt'), 'after');
+});
+test('a changed HEAD clears candidate attribution', async t => {
+  const ws = await fixture(t);
+  await ws.writeFile('ok.mjs', "console.log('ok')");
+  const original = await ws.git.commit('candidate');
+  const exec = ws.exec;
+  ws.exec = async (...args) => { const value = await exec(...args); ws.git.head = async () => 'a'.repeat(40); return value; };
+  const spec = {...base, acceptance:[{id:'H',itemId:'W1',type:'command',run:['node','ok.mjs'],generate:false,expectExitCode:0}]};
+  const report = await runChecks(opts(ws,spec,{commit:original,acceptanceTree:null}));
+  assert.equal(report.results[0].status, 'pass');
+  assert.equal(report.candidate, null);
+});
