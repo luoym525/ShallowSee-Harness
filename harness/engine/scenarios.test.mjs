@@ -593,7 +593,7 @@ test('API quota during intake saves an honest report with an unknown reset and n
   });
   assert.equal(summary.status, 'partial');
   assert.equal(summary.resumeAt, null);
-  assert.equal(summary.workspaceDir, null);
+  await assert.rejects(readdir(summary.workspaceDir), { code: 'ENOENT' });
   assert.equal(kit.modelClient.calls.length, 1);
   const report = await readText(kit.dataDir, runId, 'REPORT.md');
   assert.match(report, /provider did not supply a reset time/);
