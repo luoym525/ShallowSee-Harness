@@ -7,6 +7,7 @@ import { test } from 'node:test';
 import { readRun, startRun } from './index.mjs';
 import { FAKE_KEY, REFS, fakeConfig, makeKit, makeSpec, readJson, readLog, readText } from './testkit.mjs';
 import { SKILLS } from '../skills/index.mjs';
+import * as quotaRouter from '../router/index.mjs';
 
 const validator = fileURLToPath(new URL('../../samples/validate-events.mjs', import.meta.url));
 const WISH = 'I want a page that tells me if I need an umbrella in London tomorrow';
@@ -460,4 +461,158 @@ test('a fatal engine error is recorded redacted in state.error and the run ends 
   assert.equal(state.error.code, 'disk_error');
   assert.ok(!state.error.message.includes(FAKE_KEY));
   assert.match(state.error.message, /disk exploded/);
+});
+
+function quotaFixture(providerIds) {
+  const base = fakeConfig();
+  const models = [REFS.fable, REFS.opus, REFS.sonnet, REFS.haiku].map(ref => ({
+    id: ref.split('/')[1], enabled: true,
+  }));
+  return { ...base, providers: providerIds.map(id => ({ ...base.providers[0], id, models })) };
+}
+
+const QUOTA_RESET = '2099-12-12T15:20:00.000Z';
+function providerLimit(code = 'quota_exhausted', extra = {}) {
+  return Object.assign(new Error('Provider diagnostic with ' + FAKE_KEY), {
+    code, retryable: code === 'rate_limit', resetAt: QUOTA_RESET, ...extra,
+  });
+}
+
+test('API quota pauses with a durable partial result, reset time and completed work', async t => {
+  const { kit, summary, events, runId } = await execute(t, {
+    search: false, config: quotaFixture(['anthropic']), depsOverride: { router: quotaRouter },
+    onComplete: (_req, call) => { if (call.content === 'build W2') throw providerLimit(); },
+  });
+  assert.equal(summary.status, 'partial');
+  assert.equal(summary.pausedReason, 'api_quota');
+  assert.equal(summary.resumeAt, QUOTA_RESET);
+  assert.equal(kit.modelClient.calls.at(-1).content, 'build W2');
+  assert.equal(kit.modelClient.calls.filter(call => call.content === 'build W2').length, 1);
+  const state = await readRun(runId, { dataDir: kit.dataDir });
+  assert.equal(state.pausedReason, 'api_quota');
+  assert.equal(state.resumeAt, QUOTA_RESET);
+  assert.equal(state.items.W1.status, 'passed');
+  assert.match(state.best.commit, /^[a-f0-9]{40}$/);
+  assert.equal(await readText(kit.dataDir, runId, 'workspace/W1.txt'), 'ok');
+  assert.equal((await readJson(kit.dataDir, runId, 'spec.json')).specVersion, 1);
+  assert.match(await readText(kit.dataDir, runId, 'progress.md'), /Paused for API quota/);
+  const report = await readText(kit.dataDir, runId, 'REPORT.md');
+  assert.match(report, /Completed work items: W1/);
+  assert.ok(report.includes(QUOTA_RESET) && report.includes(state.best.commit));
+  assert.match(report, /Start a fresh run after the quota resets/);
+  assert.equal(ofType(events, 'harness.run.finished')[0].payload.pausedReason, 'api_quota');
+  assert.deepEqual(ofType(events, 'harness.provider.limited').map(e => e.payload), [{
+    provider: 'anthropic', kind: 'quota_exhausted', resetAt: QUOTA_RESET,
+    reason: 'anthropic API quota reached until ' + QUOTA_RESET + ', no fallback is available.',
+  }]);
+  assert.ok(!JSON.stringify(events).includes(FAKE_KEY) && !report.includes(FAKE_KEY));
+});
+
+test('API quota excludes all models of that configured provider only for the current run', async t => {
+  const { kit, summary, events } = await execute(t, {
+    search: false, config: quotaFixture(['anthropic', 'backup']), depsOverride: { router: quotaRouter },
+    onComplete: (_req, call) => {
+      if (call.model === REFS.haiku && call.content === 'build W1') throw providerLimit();
+    },
+  });
+  assert.equal(summary.status, 'delivered');
+  assert.equal(summary.pausedReason, undefined);
+  const calls = kit.modelClient.calls;
+  const limited = calls.findIndex(call => call.model === REFS.haiku && call.content === 'build W1');
+  assert.ok(limited >= 0);
+  assert.equal(calls[limited + 1].model, 'backup/' + REFS.haiku.split('/')[1]);
+  assert.ok(calls.slice(limited + 1).every(call => call.model.startsWith('backup/')));
+  assert.deepEqual(ofType(events, 'harness.provider.limited').map(({ payload }) => payload.kind), ['quota_exhausted']);
+  assert.match(ofType(events, 'harness.provider.limited')[0].payload.reason, /continuing with backup/);
+  const nextRun = startRun({ wish: WISH, config: kit.config, dataDir: kit.dataDir, deps: kit.deps });
+  const firstCallIndex = calls.length;
+  await nextRun.done;
+  assert.match(calls[firstCallIndex].model, /^anthropic\//, 'a separate run may use the provider again');
+});
+
+test('a short rate limit uses a same-tier fallback and keeps the original provider available', async t => {
+  const { kit, events, summary } = await execute(t, {
+    search: false, config: quotaFixture(['anthropic', 'backup']), depsOverride: { router: quotaRouter },
+    onComplete: (_req, call) => {
+      if (call.model === REFS.haiku && call.content === 'build W1') throw providerLimit('rate_limit', { resetAt: null });
+    },
+  });
+  assert.equal(summary.status, 'delivered');
+  assert.equal(summary.pausedReason, undefined);
+  const calls = kit.modelClient.calls;
+  const limited = calls.findIndex(call => call.model === REFS.haiku && call.content === 'build W1');
+  assert.ok(limited >= 0);
+  assert.equal(calls[limited + 1].model, 'backup/' + REFS.haiku.split('/')[1]);
+  assert.ok(calls.slice(limited + 2).some(call => call.model.startsWith('anthropic/')));
+  const [event] = ofType(events, 'harness.provider.limited');
+  assert.equal(event.payload.kind, 'rate_limit');
+  assert.equal(event.payload.resetAt, null);
+});
+
+test('a quota error that reaches the configured USD limit keeps the budget outcome separate', async t => {
+  const { kit, summary, events, runId } = await execute(t, {
+    search: false, config: quotaFixture(['anthropic']), depsOverride: { router: quotaRouter },
+    onComplete: (_req, call) => {
+      if (call.content === 'build W2') throw providerLimit('quota_exhausted', {
+        usage: { inputTokens: 2, outputTokens: 2, costUsd: 5, source: 'provider' },
+      });
+    },
+  });
+  assert.equal(summary.status, 'partial');
+  assert.equal(summary.pausedReason, undefined);
+  assert.equal(summary.resumeAt, undefined);
+  assert.ok(ofType(events, 'harness.budget.updated').some(e => e.payload.exceeded === 'usd'));
+  assert.equal(kit.modelClient.calls.at(-1).content, 'build W2');
+  assert.match(await readText(kit.dataDir, runId, 'REPORT.md'), /the usd limit was reached/);
+});
+
+test('cancellation wins over a concurrent quota error', async t => {
+  const kit = await makeKit({
+    builder: ok, search: false, config: quotaFixture(['anthropic', 'backup']), depsOverride: { router: quotaRouter },
+    onComplete: (_req, call) => {
+      if (call.content === 'build W2') {
+        handle.cancel('stop requested');
+        throw providerLimit();
+      }
+    },
+  });
+  t.after(kit.cleanup);
+  const handle = startRun({ wish: WISH, config: kit.config, dataDir: kit.dataDir, deps: kit.deps });
+  const summary = await handle.done;
+  const events = await readLog(kit.dataDir, handle.runId);
+  assert.equal(summary.status, 'cancelled');
+  assert.equal(summary.pausedReason, undefined);
+  assert.equal(ofType(events, 'harness.provider.limited').length, 0);
+  assert.equal(kit.modelClient.calls.at(-1).content, 'build W2');
+});
+
+test('API quota during intake saves an honest report with an unknown reset and no product', async t => {
+  const { kit, summary, events, runId } = await execute(t, {
+    search: false, config: quotaFixture(['anthropic']), depsOverride: { router: quotaRouter },
+    onComplete: () => { throw providerLimit('quota_exhausted', { resetAt: null }); },
+  });
+  assert.equal(summary.status, 'partial');
+  assert.equal(summary.resumeAt, null);
+  assert.equal(summary.workspaceDir, null);
+  assert.equal(kit.modelClient.calls.length, 1);
+  const report = await readText(kit.dataDir, runId, 'REPORT.md');
+  assert.match(report, /provider did not supply a reset time/);
+  assert.match(report, /Nothing to run yet/);
+  assert.match(report, /No checks were run/);
+  assert.equal(ofType(events, 'harness.run.finished')[0].payload.resumeAt, null);
+});
+
+test('when every configured provider is exhausted the earliest future reset is reported', async t => {
+  const { kit, summary, events } = await execute(t, {
+    search: false, config: quotaFixture(['anthropic', 'backup']), depsOverride: { router: quotaRouter },
+    onComplete: (_req, call) => {
+      if (call.content === 'build W1') throw providerLimit('quota_exhausted', {
+        resetAt: call.model.startsWith('anthropic/') ? QUOTA_RESET : '2099-12-12T12:00:00.000Z',
+      });
+    },
+  });
+  assert.equal(summary.status, 'partial');
+  assert.equal(summary.resumeAt, '2099-12-12T12:00:00.000Z');
+  assert.deepEqual(kit.modelClient.calls.filter(call => call.content === 'build W1').map(call => call.model.split('/')[0]), ['anthropic', 'backup']);
+  assert.deepEqual(ofType(events, 'harness.provider.limited').map(e => e.payload.provider), ['anthropic', 'backup']);
 });

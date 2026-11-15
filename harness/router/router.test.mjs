@@ -179,3 +179,16 @@ test('empty rosters throw a configuration error and preview keeps all nine roles
   assert.deepEqual(rows[0], { role: 'intake', model: ref('haiku'), tier: 1, reason: 'Pinned by you in Setup: haiku.', pinned: true });
   assert(describeRouting([]).every(row => row.model === null && row.tier === null && /Setup/.test(row.reason)));
 });
+
+test('hard provider exclusion applies to every model, suggestions and pins but not another account of the same vendor', () => {
+  const backup = { ...roster.find(model => model.ref === ref('haiku')), providerId: 'backup', ref: 'backup/claude-haiku-5-5' };
+  const decision = selectModel({ role: 'builder', suggested: ref('haiku'), avoidProviders: ['anthropic'] }, [...roster, backup], {
+    overrides: { builder: ref('sonnet') },
+  });
+  assert.equal(decision.model, backup.ref);
+  assert.equal(decision.pinned, false);
+  assert.equal(decision.suggested, false);
+  assert.deepEqual(decision.fallbacks, []);
+  assert.match(decision.reason, /unavailable provider/);
+  assert.throws(() => selectModel({ role: 'builder', avoidProviders: ['anthropic'] }, roster), codes('no_match'));
+});
