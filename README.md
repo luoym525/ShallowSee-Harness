@@ -1,3 +1,54 @@
+# ShallowSee Autopilot
+
+**Type a wish. Get a tested product.** A person with no technical background describes what they want. The harness then researches with live web search (Linkup), writes a plan, checks the plan's facts against current sources (built-in Shelf Life skill), has an independent model approve it, builds one piece at a time in a sandbox, tests every piece with an independent tester, reflects, switches to a stronger model when a piece keeps failing, and hands over the product with an honest report. It asks the user nothing during the run.
+
+The harness picks a model for every step: the strongest model plans, an independent model reviews and tests, and cheaper models write the code unless the planner or a failed test says otherwise. Every choice is logged with a one-line reason.
+
+## Quick start
+
+1. Node.js 20 or later. No `npm install`; there are no dependencies.
+2. `cp apiConfig.example.json apiConfig.json`, then paste your Anthropic and Linkup keys (git ignores the file), or add providers on the console's Setup page.
+3. Check the setup and see which model each role gets: `node harness/bin/shallowsee.mjs config check`
+4. Run a wish from the command line: `node harness/bin/shallowsee.mjs run "I want a page that splits a restaurant bill between friends" --budget-usd 3`
+5. Or use the web console: `node harness/console/server/index.mjs`, then open http://127.0.0.1:4320. Finished web products open on a separate preview origin, http://127.0.0.1:4321.
+
+## First real run (15 Nov 2026, real Anthropic and Linkup keys)
+
+Run `hr-20261115-104503-z4sl`, wish: *"a simple web page where I type in my restaurant bill and how many friends are sharing it, and it tells each person how much to pay, including the usual UK service charge."*
+
+| Step | What happened |
+|---|---|
+| Research | 4 live Linkup searches, 4 findings |
+| Plan | Claude Opus 5.5 wrote the plan; version 1 broke 2 of the harness's spec rules and was revised automatically |
+| Plan check | Shelf Life skill checked the plan's facts against live sources: 1 claim, 0 stale |
+| Approval | Auto-approved by Claude Sonnet 5.5, a different model from the planner (recorded as a model approval, not a user approval) |
+| Build | The planner chose each item's coder (Sonnet for item 1, Haiku for item 3). Item 2 failed twice; attempt 3 escalated to Claude Opus 5.5 and passed 8/8 |
+| Final test | 10 of 11 acceptance checks passed. The 11th, a visual check, was skipped because no headless browser was available, so the run is honestly reported as **partial**, not delivered |
+| Final review | Ship, with 7 listed gaps |
+| Cost and time | $2.17, 9.0 minutes |
+
+An earlier attempt the same morning failed at planning because the planner's output hit a 4,096-token cap; that was fixed (PR #22) before this run.
+
+## How it works
+
+- [harness/README.md](harness/README.md): user guide
+- [harness/docs/ARCHITECTURE.md](harness/docs/ARCHITECTURE.md): the plan → plan check → review → build → test → reflect loop, budgets, keep-best, autonomy setting
+- [harness/docs/METHODOLOGY.md](harness/docs/METHODOLOGY.md): which published practices from Anthropic, OpenAI, Google DeepMind and DeepSeek each design rule follows, with sources
+- [harness/contracts/](harness/contracts/): the module interfaces, run artifacts, events and HTTP API
+- Sandbox: model-written code runs under Node's permission model (workspace-only file access, no child processes, no keys in its environment); acceptance tests run from a read-only frozen copy
+
+Offline test suite (no keys needed), 317 tests at the time of writing:
+
+```sh
+node --test "apps/**/*.test.mjs" "eval/**/*.test.mjs" "packages/**/*.test.mjs" "harness/**/*.test.mjs"
+```
+
+Built by Bill, LYM and Lynx with a team of coding agents, at Imperial AI Hack 2026.
+
+---
+
+> **Earlier README (team history).** The text below predates the harness above, and its status notes about what is "not yet implemented" are out of date.
+
 # ShallowSee Harness · 许愿式编程
 
 ShallowSee 的产品目标是：用户提出想法，Harness 根据用户当前目的和项目状态，调度售前、规划、项目经理、开发、测试和售后 Agent，完成从想法到软件交付的全过程。各岗位采用不同模型配置控制成本；只有售前、规划和项目经理可以使用搜索 API 核实成熟方案与实时事实。
