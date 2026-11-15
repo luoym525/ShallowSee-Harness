@@ -226,6 +226,9 @@ interface Workspace {
     changedFiles(fromSha: string, toSha?: string): Promise<string[]>;
     treeHash(path: string): Promise<string | null>;         // git hash of a subtree, used for the acceptance tamper check
     restorePath(sha: string, path: string): Promise<void>;  // `git checkout <sha> -- <path>` then commit "restore <path>"; used to undo tampering
+    status(): Promise<{ clean: boolean; changed: string[] }>;   // read-only (room #366/#372): external git dir, hooks and config
+                                                            // locked, `--no-optional-locks status --porcelain=v1 -z --untracked-files=all`;
+                                                            // throws git_failed on error. Callers treat missing/throwing as NOT clean.
   };
 }
 
