@@ -69,12 +69,12 @@ async function route() {
   clear(app).append(h("div", { class: "page-narrow" }, h("div", { class: "card empty-card" }, h("h2", null, "That page doesn't exist"), h("a", { class: "btn primary", href: "#/new" }, "Make a wish"))));
 }
 
-// ---- theme: dark by default; "system" follows the OS; the choice is remembered when storage allows
-const THEMES = ["dark", "light", "system"];
+// ---- theme: light by default; "system" follows the OS; the choice is remembered when storage allows
+const THEMES = ["light", "dark", "system"];
 const themeBtn = document.getElementById("theme-toggle");
 function currentTheme() {
   const t = document.documentElement.getAttribute("data-theme");
-  return THEMES.includes(t) ? t : "dark";
+  return THEMES.includes(t) ? t : "light";
 }
 function paintThemeButton() {
   const t = currentTheme();

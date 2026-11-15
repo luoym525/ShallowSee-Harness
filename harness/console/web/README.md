@@ -7,14 +7,14 @@ What a non-technical person uses: **Setup** (providers, CC Switch style), **Make
 | Route | Screen |
 |---|---|
 | `#/new` | Make a wish: big textarea, 4 example chips, budget summary, **Start**. Friendly card to Setup when no model is configured. |
-| `#/runs/:id` | **Live run**: wish, status, elapsed, spend, iteration; the Plan → Build → Test → Reflect loop ring; work items with attempts and score bars; **Who's working** (role, model, the router's one-line reason, escalations); plan fact check; **Auto-approved by <model>** badge; README fact check ("Proposed, unreviewed"); sources; models table; timeline with expandable test evidence. When finished: **Open the product** (new tab on the preview origin `:4321`, never embedded). |
+| `#/runs/:id` | **Live run**: wish, status, elapsed, spend, build attempts, best score. Below them, one loop stage at a time: **Plan** (the **Auto-approved by <model>** badge, plan fact check, sources), **Build** (work items with attempts and score history), **Test** (latest test with its evidence, every test so far), **Reflect** (latest decision, final review, README fact check marked "Proposed, unreviewed"). The screen follows the running stage; clicking a stage pins it until **Follow live**. **Now working** (role, model, the router's reason, escalations) sits beside the running stage. **Activity** (the timeline with expandable test evidence) and **Models** are one click away. When finished: **Open the product** (new tab on the preview origin `:4321`, never embedded). |
 | `#/runs/:id/report`, `/files` | Rendered `REPORT.md` (tiny safe Markdown renderer) and a file browser (product files and run records). |
 | `#/runs` | History with status, product, score, spend, date. |
 | `#/setup` | Provider cards: name, Model/Search/GitHub badge, URL, key status (`sk-…ab12` or No key), model count, Enabled, **Test**, **Fetch models**, **Edit**, **Delete** (confirm). |
 | `#/setup/new`, `#/setup/:id` | Add / Edit provider: preset chips, Provider name, Notes, Website, API Key, Request URL, Models, Advanced headers, sticky Cancel / + Add. |
 | `#/routing` | Routing table (role · model · tier · reason, Auto / pin a model), autonomy (full autopilot vs confirm the plan), budget. |
 
-Dark by default; the theme button cycles dark → light → system (system follows `prefers-color-scheme`). Animations respect `prefers-reduced-motion`.
+Monochrome: black, white and greys, with one red for failures and stale facts. Apple-style type from the system font stack (SF Pro on Apple devices, Segoe UI Variable on Windows; no web fonts). Light by default; the theme button cycles light → dark → system (system follows `prefers-color-scheme`). Animations respect `prefers-reduced-motion`.
 
 ## Files
 

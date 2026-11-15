@@ -142,6 +142,8 @@ try {
   ok((await text("[data-testid=approval-badge]")).startsWith("Approved by Claude Opus 5.5"), "Confirm mode: badge says Approved by <model>, waiting for you");
   ok(!(await text("[data-testid=approval]")).includes("Auto-approved"), "…and never says Auto-approved");
   ok(await exists("[data-testid=synthetic-label]"), "The run is labelled Synthetic replay");
+  ok(await b.evaluate(`document.querySelector('[data-stage-tab=plan]').getAttribute('aria-pressed') === 'true'`), "The Live run follows the running stage: Plan is shown while waiting for you");
+  await click("[data-stage-tab=plan]"); // pin Plan, so the badge stays in view after building starts
   await click("[data-testid=confirm-plan]");
   await b.waitFor("document.querySelector('[data-testid=approval-badge]').innerText === 'Confirmed by you'", 20000);
   ok(true, "After Confirm plan the badge says Confirmed by you");
@@ -156,13 +158,23 @@ try {
   await sleep(300);
   await b.go(url, "#/runs/" + mock.sampleRunId);
   await b.waitFor("document.querySelector('[data-testid=result-banner]')");
+  ok(await exists("[data-testid=panel-test] [data-testid=latest-test]"), "A finished run opens on Test, with the final test");
+  await b.waitFor("document.querySelector('[data-testid=latest-test] .ev-row')");
+  ok((await text("[data-testid=latest-test]")).includes("Final test"), "…showing the final test and its checks");
+  await click("[data-stage-tab=plan]");
   ok((await text("[data-testid=approval-badge]")) === "Auto-approved by Claude Opus 5.5", "Sample run: Auto-approved by Claude Opus 5.5");
   ok((await text("[data-testid=plan-check]")).includes("1 stale"), "Plan fact check shows the stale fact that forced a revision");
   await b.waitFor("document.querySelector('[data-testid=plan-check] .shift')");
   ok((await text("[data-testid=plan-check] .shift")).includes("16 days"), "…with the old → proposed values");
+  await click("[data-stage-tab=reflect]");
   ok((await text("[data-testid=fact-check]")).includes("Proposed, unreviewed"), "README fact check is labelled Proposed, unreviewed");
   ok(!/confirmed/i.test(await text("[data-testid=fact-check]")), "…and never says Confirmed");
+  ok(await exists("[data-testid=latest-decision]"), "Reflect shows the latest decision");
+  await click("[data-stage-tab=build]");
   ok((await text("[data-testid=work-items]")).includes("80% → 100%"), "Work item W2 shows its score history 80% → 100%");
+  await click("[data-view-btn=models]");
+  ok(await exists("[data-testid=models] .mini-table"), "Models opens the models used in this run");
+  await click("[data-view-btn=activity]");
   await b.evaluate(`[...document.querySelectorAll('.tl-details summary')].find(s => s.innerText.includes('W2: 4/5 checks passed')).click()`);
   await b.waitFor("document.querySelector('.tl-details[open] .ev-row.fail')");
   ok((await text(".tl-details[open] .evidence-table")).includes("expected \"Take an umbrella\""), "Expanding a failed test shows the tester's evidence");
@@ -180,7 +192,7 @@ try {
   await b.waitFor("document.querySelectorAll('.runs-table tbody tr').length >= 2");
   ok((await text(".runs-table")).includes("Synthetic"), "Runs history marks synthetic runs");
   await click("#theme-toggle");
-  ok(await b.evaluate(`document.documentElement.getAttribute('data-theme') === 'light'`), "Theme toggle switches dark → light");
+  ok(await b.evaluate(`document.documentElement.getAttribute('data-theme') === 'dark'`), "Theme toggle switches light → dark");
 
   ok(b.errors.length === 0, `No browser console errors${b.errors.length ? `: ${b.errors.slice(0, 3).join(" | ")}` : ""}`);
 } catch (e) {

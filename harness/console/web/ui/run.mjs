@@ -2,24 +2,28 @@
 // Everything shown is derived from the event stream through model.mjs. No HTML is ever built from data.
 
 import {
-  createRunView, applyEvent, LOOP_STAGES, loopStageForPhase, phaseLabel, roleLabel, statusLabel, statusTone, isFinishedStatus,
+  createRunView, applyEvent, LOOP_STAGES, loopStageForPhase, roleLabel, statusLabel, statusTone, isFinishedStatus,
   shortModelName, modelFamilyName, formatUsd, formatDuration, formatPercent, elapsedMs, offsetLabel, spendLabel, iterationLabel,
   approvalBadge, whoIsWorking, modelsTable, itemStatusLabel, factCheckRows, factCheckSummary, safeUrl, domainOf,
 } from "../model.mjs";
 import { renderMarkdown } from "../markdown.mjs";
-import { h, svg, icon, chip, button, clear, setMarkdown, toast, onReducedMotion, add } from "./dom.mjs";
+import { h, icon, chip, button, clear, setMarkdown, toast, add } from "./dom.mjs";
 import { get, post, artifactPath, filePath, previewUrl, followRun } from "./api.mjs";
 
+// The Live run shows one loop stage at a time. By default it follows the stage that is running;
+// clicking a stage pins it until "Follow live". Activity (the timeline) and Models are one click away.
 const STAGE_INFO = {
-  plan: { label: "Plan", blurb: "Research, plan, check the plan's facts, independent approval" },
-  build: { label: "Build", blurb: "A coder model writes the code, one work item at a time" },
-  test: { label: "Test", blurb: "A different model runs the acceptance checks" },
-  reflect: { label: "Reflect", blurb: "Decide: next item, retry, or escalate to a stronger model" },
+  plan: { label: "Plan", empty: "Researching the wish and writing a plan." },
+  build: { label: "Build", empty: "Work items appear here once the plan is approved." },
+  test: { label: "Test", empty: "Each work item is tested by a different model after it is built." },
+  reflect: { label: "Reflect", empty: "After each test, a model decides what happens next: move on, retry, or use a stronger model." },
 };
+const DECISION_LABEL = { next: "Move on", retry: "Retry with fixes", escalate: "Retry with a stronger model", replan: "Revise the plan", finish: "Finish", stop: "Stop" };
+const OVERRIDE_NOTE = { all_checks_pass: "Set by the harness: all checks pass.", attempts_exhausted: "Set by the harness: attempts used up.", budget: "Set by the harness: budget used up." };
 
 export function mountRun(root, runId, { tab = "run", setConnection }) {
   const view = createRunView(runId);
-  const ui = { showTools: false, open: new Set(), reports: new Map(), loading: new Set(), serverState: null, artifacts: [], notFound: false, streamState: "connecting", files: null, fileView: null, reportMd: undefined, tab };
+  const ui = { showTools: false, open: new Set(), reports: new Map(), loading: new Set(), serverState: null, artifacts: [], notFound: false, streamState: "connecting", files: null, fileView: null, reportMd: undefined, tab, view: null };
   let raf = 0;
   let stream = null;
   let ticker = null;
@@ -78,18 +82,19 @@ export function mountRun(root, runId, { tab = "run", setConnection }) {
   }
 
   function loadReports() {
-    const wanted = [];
-    for (const c of view.planChecks) if (c.reportPath && c.status !== "running") wanted.push(c.reportPath);
-    if (view.factCheck?.reportPath && view.factCheck.status !== "running") wanted.push(view.factCheck.reportPath);
-    for (const name of wanted) {
-      if (ui.reports.has(name) || ui.loading.has(name)) continue;
-      ui.loading.add(name);
-      get(artifactPath(runId, name)).then((res) => {
-        ui.loading.delete(name);
-        ui.reports.set(name, res.ok && res.data ? res.data : null);
-        schedule();
-      });
-    }
+    for (const c of view.planChecks) if (c.reportPath && c.status !== "running") loadReport(c.reportPath);
+    if (view.factCheck?.reportPath && view.factCheck.status !== "running") loadReport(view.factCheck.reportPath);
+  }
+
+  // Run records are JSON artifacts; each is fetched once. undefined = not asked yet, null = not available.
+  function loadReport(name) {
+    if (!name || ui.reports.has(name) || ui.loading.has(name)) return;
+    ui.loading.add(name);
+    get(artifactPath(runId, name)).then((res) => {
+      ui.loading.delete(name);
+      ui.reports.set(name, res.ok && res.data ? res.data : null);
+      schedule();
+    });
   }
 
   // ---------------------------------------------------------------- render
@@ -163,24 +168,181 @@ export function mountRun(root, runId, { tab = "run", setConnection }) {
     t.append(mk("run", "Live run", true, `#/runs/${runId}`), mk("report", "Report", hasReport || finished, `#/runs/${runId}/report`), mk("files", "Files", finished || view.artifacts.length > 0, `#/runs/${runId}/files`));
   }
 
-  // ---- Run tab
-  let runGrid = null;
+  // ---- Run tab: the stage bar (Plan · Build · Test · Reflect, Activity, Models) and one panel
+  let runShell = null;
   function renderRunTab() {
-    if (!runGrid || !els.body.contains(runGrid)) {
+    if (!runShell || !els.body.contains(runShell)) {
       clear(els.body);
-      els.main = h("div", { class: "col-main" });
-      els.side = h("div", { class: "col-side" });
       els.banner = h("div", { class: "banner-slot" });
-      runGrid = h("div", { class: "grid" }, els.main, els.side);
-      els.ringSlot = h("div"); els.itemsSlot = h("div");
-      els.main.append(els.ringSlot, els.itemsSlot, timelineCard);
-      els.body.append(els.banner, runGrid);
+      els.stagebar = h("div", { class: "stagebar" });
+      els.panel = h("div", { class: "panel" });
+      els.panelView = null;
+      runShell = h("div", { class: "run-shell" }, els.banner, els.stagebar, els.panel);
+      els.body.append(runShell);
     }
     renderBanner();
-    clear(els.ringSlot).append(ringCard());
-    clear(els.itemsSlot).append(itemsCard());
-    add(clear(els.side), whoCard(), planCheckCard(), approvalCard(), factCheckCard(), sourcesCard(), modelsCard());
+    const shown = shownView();
+    renderStagebar(shown);
     syncTimeline();
+    if (shown === "activity") {
+      // The timeline is updated in place; re-attaching it every frame would reset its scroll and open rows.
+      if (els.panelView !== "activity") { clear(els.panel).append(timelineCard); els.panelView = "activity"; }
+      return;
+    }
+    els.panelView = shown;
+    let { main, side } = panelParts(shown);
+    main = main.filter(Boolean); side = side.filter(Boolean);
+    if (!main.length) { main = side; side = []; }
+    if (!main.length) main = [h("p", { class: "panel-empty" }, STAGE_INFO[shown]?.empty || "Nothing here yet.")];
+    const grid = h("div", { class: `panel-grid${side.length ? "" : " single"}`, "data-view": shown, "data-testid": `panel-${shown}` }, h("div", { class: "panel-col" }, main));
+    if (side.length) grid.append(h("div", { class: "panel-col side" }, side));
+    clear(els.panel).append(grid);
+  }
+
+  // The stage that is running now (null once the run has finished).
+  function liveStage() {
+    if (view.status === "awaiting_confirmation") return "plan";
+    if (isFinishedStatus(status())) return null;
+    return loopStageForPhase(view.phase) || "plan";
+  }
+
+  function shownView() {
+    if (ui.view) return ui.view;
+    return liveStage() || "test";
+  }
+
+  function pick(next) {
+    ui.view = next;
+    render();
+  }
+
+  // Has this stage run at least once? Stages repeat each iteration, so earlier ones stay "done".
+  function stageHappened(id) {
+    if (id === "plan") return !!(view.plan || view.reviews.length || view.approval);
+    if (id === "build") return view.builds.length > 0 || view.items.some((i) => i.attempts > 0);
+    if (id === "test") return view.tests.length > 0;
+    return view.reflections.length > 0 || !!view.finalReview;
+  }
+
+  function stageMeta(id) {
+    if (id === "plan") {
+      const b = approvalBadge(view);
+      if (b.state === "auto") return "Auto-approved";
+      if (b.state === "confirmed") return "Confirmed by you";
+      if (b.state === "awaiting") return "Waiting for you";
+      if (b.state === "model") return "Approved";
+      if (b.state === "revise") return "Being revised";
+      if (b.state === "pending") return "In review";
+      return liveStage() === "plan" ? (PHASE_WORD[view.phase] || "Working") : "Not started";
+    }
+    if (id === "build") {
+      const items = view.items;
+      if (!items.length) return "Not started";
+      const done = items.filter((i) => i.status === "passed").length;
+      return `${done} of ${items.length} passed`;
+    }
+    if (id === "test") {
+      const t = view.tests[view.tests.length - 1];
+      if (!t) return "Not started";
+      return `${t.scope === "all" ? "Final" : t.itemId}: ${t.passed}/${t.total} checks`;
+    }
+    const r = view.reflections[view.reflections.length - 1];
+    if (r) return `${r.itemId ? `${r.itemId}: ` : ""}${DECISION_LABEL[r.decision] || "Continue"}`;
+    return view.finalReview ? "Final review done" : "Not started";
+  }
+  const PHASE_WORD = { intake: "Reading the wish", research: "Researching", plan: "Planning", plan_check: "Checking facts", plan_review: "In review", scaffold: "Setting up" };
+
+  function renderStagebar(shown) {
+    const finished = isFinishedStatus(status());
+    const live = liveStage();
+    const tabs = h("div", { class: "stage-tabs", role: "group", "aria-label": "Loop stages" });
+    for (const id of LOOP_STAGES) {
+      const state = id === live ? "now" : stageHappened(id) ? "done" : "";
+      const selected = shown === id;
+      tabs.append(h("button", { type: "button", class: `stage-tab${selected ? " selected" : ""}`, "aria-pressed": selected ? "true" : "false", "data-stage-tab": id, onclick: () => pick(id) },
+        h("span", { class: `stage-bar ${state}`, "aria-hidden": "true" }),
+        h("span", { class: "stage-name" }, STAGE_INFO[id].label, state === "now" ? h("span", { class: "stage-now" }, "now") : null),
+        h("span", { class: "stage-meta" }, stageMeta(id))));
+    }
+    const viewBtn = (id, label, iconName) => h("button", { type: "button", class: `view-btn${shown === id ? " on" : ""}`, "aria-pressed": shown === id ? "true" : "false", "data-view-btn": id, onclick: () => pick(shown === id ? null : id) }, icon(iconName, 14), h("span", null, label));
+    clear(els.stagebar).append(tabs, h("div", { class: "view-btns" },
+      ui.view && !finished && ui.view !== live ? h("button", { type: "button", class: "follow-btn", onclick: () => pick(null), title: "Show the stage that is running now" }, h("span", { class: "dot", "aria-hidden": "true" }), "Follow live") : null,
+      viewBtn("activity", "Activity", "list"),
+      viewBtn("models", "Models", "layers")));
+  }
+
+  // What each view shows: the main column and a narrower side column (dropped when empty).
+  function panelParts(id) {
+    const who = id === liveStage() ? whoCard() : null;
+    switch (id) {
+      case "plan": return { main: [approvalCard(), planCheckCard()], side: [who, sourcesCard()] };
+      case "build": return { main: [itemsCard()], side: [who] };
+      case "test": return { main: [latestTestCard()], side: [who, testsHistoryCard()] };
+      case "reflect": return { main: [latestDecisionCard(), finalReviewCard()], side: [who, factCheckCard()] };
+      case "models": return { main: [modelsCard()], side: [] };
+      default: return { main: [], side: [] };
+    }
+  }
+
+  // ---- Test: the latest test with its evidence, and every test so far
+  function latestTestCard() {
+    const t = view.tests[view.tests.length - 1];
+    if (!t) return null;
+    const ok = t.total > 0 && t.passed === t.total && t.acceptanceIntact;
+    const card = h("section", { class: "card", "aria-label": "Latest test", "data-testid": "latest-test" },
+      h("div", { class: "card-head" }, h("h2", null, "Latest test")),
+      h("div", { class: "big-line" }, h("span", { class: `result-mark ${ok ? "good" : "bad"}`, "aria-hidden": "true" }, icon(ok ? "check" : "x", 13)), `${t.scope === "all" ? "Final test" : t.itemId} · ${t.passed} of ${t.total} checks passed`),
+      h("p", { class: "muted sm", style: "margin-top:6px" }, [`Tested by ${shortModelName(t.testerModel)}`, t.candidate ? `candidate ${String(t.candidate).slice(0, 7)}` : null, t.acceptanceIntact ? null : "acceptance tests were modified, so every result counts as failed"].filter(Boolean).join(" · ")));
+    const holder = h("div", { class: "evidence" });
+    card.append(holder);
+    const report = t.reportPath ? ui.reports.get(t.reportPath) : null;
+    if (report) holder.append(evidenceTable(report, { compact: true }));
+    else if (t.reportPath && report === undefined) { holder.append(h("p", { class: "muted sm" }, "Loading the evidence…")); loadReport(t.reportPath); }
+    else if (t.failures.length) holder.append(h("ul", { class: "fail-list" }, t.failures.map((f) => h("li", null, h("b", { class: "mono" }, `${f.checkId} `), f.message))));
+    return card;
+  }
+
+  function testsHistoryCard() {
+    if (view.tests.length < 2) return null;
+    return h("section", { class: "card", "aria-label": "All tests" },
+      h("div", { class: "card-head" }, h("h2", null, "All tests"), h("span", { class: "muted sm num" }, String(view.tests.length))),
+      h("ul", { class: "test-list" }, view.tests.slice().reverse().map((t) => {
+        const ok = t.total > 0 && t.passed === t.total && t.acceptanceIntact;
+        return h("li", null,
+          h("span", { class: `result-mark ${ok ? "good" : "bad"}`, "aria-hidden": "true" }, icon(ok ? "check" : "x", 10)),
+          h("span", null, t.scope === "all" ? "Final test" : t.itemId),
+          h("span", { class: "muted num" }, `${t.passed}/${t.total}`),
+          h("span", { class: "num" }, formatPercent(t.score)));
+      })));
+  }
+
+  // ---- Reflect: the latest decision, earlier ones, and the final review
+  function latestDecisionCard() {
+    const rs = view.reflections;
+    if (!rs.length) return null;
+    const last = rs[rs.length - 1];
+    const card = h("section", { class: "card", "aria-label": "Latest decision", "data-testid": "latest-decision" },
+      h("div", { class: "card-head" }, h("h2", null, "Latest decision")),
+      h("div", { class: "big-line" }, `${DECISION_LABEL[last.decision] || "Continue"}${last.itemId ? ` · ${last.itemId}` : ""}`),
+      last.reason ? h("p", { class: "reason" }, last.reason) : null,
+      OVERRIDE_NOTE[last.overriddenBy] ? h("p", { class: "muted sm", style: "margin-top:6px" }, OVERRIDE_NOTE[last.overriddenBy]) : null);
+    if (rs.length > 1) {
+      card.append(h("ul", { class: "decision-list", "aria-label": "Earlier decisions" }, rs.slice(0, -1).reverse().map((r) => h("li", null,
+        h("span", { class: "d-item" }, r.itemId || "Run"),
+        h("span", null, DECISION_LABEL[r.decision] || "Continue"),
+        r.reason ? h("span", { class: "muted d-reason" }, r.reason) : null))));
+    }
+    return card;
+  }
+
+  function finalReviewCard() {
+    const f = view.finalReview;
+    if (!f) return null;
+    const verdict = f.verdict ? String(f.verdict).replace(/_/g, " ") : "Done";
+    return h("section", { class: "card", "aria-label": "Final review", "data-testid": "final-review" },
+      h("div", { class: "card-head" }, h("h2", null, "Final review"), f.reviewerModel ? h("span", { class: "muted sm" }, shortModelName(f.reviewerModel)) : null),
+      h("div", { class: "big-line" }, verdict.charAt(0).toUpperCase() + verdict.slice(1)),
+      f.gaps.length ? [h("p", { class: "muted sm", style: "margin-top:12px" }, "Known gaps"), h("ul", { class: "gap-list" }, f.gaps.map((g) => h("li", null, g)))] : null);
   }
 
   function renderBanner() {
@@ -214,52 +376,6 @@ export function mountRun(root, runId, { tab = "run", setConnection }) {
     const res = await post(`/api/runs/${encodeURIComponent(runId)}/confirm`, {});
     if (!res.ok || !res.data?.ok) toast("The plan couldn't be confirmed right now.", "bad");
   }
-
-  // ---- ring
-  function ringCard() {
-    const phase = view.phase;
-    const finished = isFinishedStatus(status());
-    const stage = finished ? null : loopStageForPhase(phase);
-    const awaiting = view.status === "awaiting_confirmation";
-    const R = 92, C = 130, gap = 12, seg = 90 - gap;
-    const polar = (deg, r) => { const a = ((deg - 90) * Math.PI) / 180; return [C + r * Math.cos(a), C + r * Math.sin(a)]; };
-    const arc = (i) => {
-      const a0 = i * 90 + gap / 2, a1 = a0 + seg;
-      const [x0, y0] = polar(a0, R), [x1, y1] = polar(a1, R);
-      return `M${x0.toFixed(2)} ${y0.toFixed(2)} A${R} ${R} 0 0 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
-    };
-    const el = svg("svg", { viewBox: "0 0 260 260", class: "ring-svg", role: "img", "aria-label": finished ? statusLabel(status()) : `Current phase: ${phaseLabel(phase, view.currentItemId)}` });
-    LOOP_STAGES.forEach((id, i) => {
-      const active = stage === id;
-      const cls = `ring-arc${active ? " active" : ""}${finished && view.status !== "cancelled" ? " done" : ""}`;
-      el.append(svg("path", { d: arc(i), class: `${cls} track`, fill: "none" }));
-      if (active) el.append(svg("path", { d: arc(i), class: "ring-arc flow", fill: "none" }));
-      const [lx, ly] = polar(i * 90 + 45, R + 24);
-      el.append(svg("text", { x: lx.toFixed(1), y: ly.toFixed(1), class: `ring-label${active ? " active" : ""}`, "text-anchor": "middle", "dominant-baseline": "middle" }, textNode(STAGE_INFO[id].label.toUpperCase())));
-      // arrow tip at the end of each arc
-      const [ax, ay] = polar(i * 90 + gap / 2 + seg + 0.5, R);
-      el.append(svg("circle", { cx: ax.toFixed(1), cy: ay.toFixed(1), r: 3, class: `ring-dot${active ? " active" : ""}` }));
-    });
-    const center = finished ? statusLabel(status()) : awaiting ? "Waiting for you" : (PHASE_SHORT[phase] || phaseLabel(phase));
-    const sub = finished ? "" : view.currentItemId && (phase === "build" || phase === "test" || phase === "reflect") ? view.currentItemId : "";
-    el.append(
-      svg("text", { x: C, y: C - 10, class: "ring-center", "text-anchor": "middle" }, textNode(center)),
-      svg("text", { x: C, y: C + 14, class: "ring-sub", "text-anchor": "middle" }, textNode(sub)),
-      svg("text", { x: C, y: C + 34, class: "ring-iter", "text-anchor": "middle" }, textNode(view.iteration > 0 ? `iteration ${view.iteration}` : "")),
-    );
-    const w = whoIsWorking(view);
-    const headline = finished ? statusLabel(status()) : awaiting ? "Waiting for your confirmation" : phaseLabel(phase, view.currentItemId);
-    return h("section", { class: "card ring-card", "aria-label": "The loop", "data-testid": "loop-ring", "data-stage": stage || "" },
-      h("div", { class: `ring-wrap${onReducedMotion() ? " still" : ""}` }, el),
-      h("div", { class: "ring-side" },
-        h("div", { class: "eyebrow" }, "The loop"),
-        h("h2", { class: "ring-headline" }, headline),
-        !finished && !w.idle ? h("p", { class: "muted ring-now" }, `${roleLabel(w.role)} · ${w.modelName}${w.attempt && w.role === "builder" ? ` · attempt ${w.attempt}` : ""}`) : null,
-        h("ol", { class: "stage-list" }, LOOP_STAGES.map((id) => h("li", { class: stage === id ? "on" : "" }, h("b", null, STAGE_INFO[id].label), h("span", null, STAGE_INFO[id].blurb)))),
-      ));
-  }
-  const PHASE_SHORT = { intake: "Intake", research: "Research", plan: "Plan", plan_check: "Fact check", plan_review: "Review", scaffold: "Scaffold", build: "Build", test: "Test", reflect: "Reflect", final_test: "Final test", final_review: "Final review", fact_check: "Fact check", report: "Report", awaiting_confirmation: "Waiting", done: "Done" };
-  const textNode = (s) => document.createTextNode(s);
 
   // ---- work items
   function itemsCard() {
@@ -297,7 +413,7 @@ export function mountRun(root, runId, { tab = "run", setConnection }) {
   // ---- who's working
   function whoCard() {
     const w = whoIsWorking(view);
-    const card = h("section", { class: `card who${w.active ? " active" : ""}`, "aria-label": "Who's working", "data-testid": "whos-working" }, h("div", { class: "card-head" }, h("h2", null, "Who's working")));
+    const card = h("section", { class: `card who${w.active ? " active" : ""}`, "aria-label": "Who's working", "data-testid": "whos-working" }, h("div", { class: "card-head" }, h("h2", null, "Now working")));
     if (w.idle) {
       card.append(h("p", { class: "muted" }, w.title === "Starting up" ? "Starting up…" : `Nobody: the run is ${w.title.toLowerCase()}.`));
       return card;
@@ -321,8 +437,8 @@ export function mountRun(root, runId, { tab = "run", setConnection }) {
     const checks = view.planChecks;
     if (!checks.length) return null;
     const card = h("section", { class: "card", "aria-label": "Plan fact check", "data-testid": "plan-check" },
-      h("div", { class: "card-head" }, h("h2", null, "Plan fact check"), chip("Shelf Life", "muted")),
-      h("p", { class: "muted sm" }, "Before anything was built, the facts this plan relies on were checked against live web sources."));
+      h("div", { class: "card-head" }, h("h2", null, "Plan fact check"), h("span", { class: "muted sm" }, "Shelf Life")),
+      h("p", { class: "muted sm", style: "margin-bottom:10px" }, "The plan's facts, checked against live web sources before building."));
     checks.forEach((c, idx) => {
       const report = c.reportPath ? ui.reports.get(c.reportPath) : null;
       const sum = factCheckSummary(c, report);
@@ -418,7 +534,7 @@ export function mountRun(root, runId, { tab = "run", setConnection }) {
     const r = view.research;
     if (!r) return null;
     return h("section", { class: "card", "aria-label": "Sources", "data-testid": "sources" },
-      h("div", { class: "card-head" }, h("h2", null, "Sources"), chip(r.basis === "model_knowledge" ? "model knowledge" : `${r.searchesUsed ?? "?"} web searches`, r.basis === "model_knowledge" ? "warn" : "muted")),
+      h("div", { class: "card-head" }, h("h2", null, "Sources"), r.basis === "model_knowledge" ? chip("model knowledge", "warn") : h("span", { class: "muted sm" }, `${r.searchesUsed ?? "?"} web searches`)),
       r.sources.length ? h("div", { class: "src-row" }, r.sources.map((s) => sourceLink(s))) : h("p", { class: "muted sm" }, "No sources: this research came from the model's own knowledge."));
   }
 
@@ -426,19 +542,20 @@ export function mountRun(root, runId, { tab = "run", setConnection }) {
   function modelsCard() {
     const rows = modelsTable(view);
     if (!rows.length) return null;
-    return h("section", { class: "card", "aria-label": "Models in this run" },
-      h("div", { class: "card-head" }, h("h2", null, "Models in this run"), view.escalations.length ? chip(`${view.escalations.length} escalation${view.escalations.length === 1 ? "" : "s"}`, "warn") : null),
+    return h("section", { class: "card", "aria-label": "Models in this run", "data-testid": "models" },
+      h("div", { class: "card-head" }, h("h2", null, "Models in this run"), view.escalations.length ? h("span", { class: "muted sm" }, `${view.escalations.length} escalation${view.escalations.length === 1 ? "" : "s"}`) : null),
       h("table", { class: "mini-table" }, h("tbody", null, rows.map((r) => h("tr", { title: r.reason },
         h("th", { scope: "row" }, r.label),
         h("td", null, r.models.map((m, i) => h("span", { class: "model-seq" }, i > 0 ? h("span", { class: "arrow" }, "→") : null, chip(modelFamilyName(m), i === r.models.length - 1 && r.escalated ? "warn" : "model")))),
-        h("td", { class: "tier" }, r.tier ? `T${r.tier}` : "")))) ));
+        h("td", { class: "tier" }, r.tier ? `T${r.tier}` : "")))) ),
+      h("p", { class: "muted sm models-note" }, "The router picks a model for each job. ", h("a", { class: "link", href: "#/routing" }, "Change routing")));
   }
 
   // ---------------------------------------------------------------- timeline (incremental)
   function buildTimelineCard() {
     const toggle = h("input", { type: "checkbox", id: "show-tools", onchange: (e) => { ui.showTools = e.target.checked; stableTimeline.classList.toggle("show-tools", ui.showTools); } });
     return h("section", { class: "card timeline-card", "aria-label": "Timeline", "data-testid": "timeline" },
-      h("div", { class: "card-head" }, h("h2", null, "Timeline"), h("label", { class: "toggle-inline", for: "show-tools" }, toggle, h("span", null, "Show tool calls"))),
+      h("div", { class: "card-head" }, h("h2", null, "Activity"), h("label", { class: "toggle-inline", for: "show-tools" }, toggle, h("span", null, "Show tool calls"))),
       stableTimeline);
   }
 
@@ -496,7 +613,7 @@ export function mountRun(root, runId, { tab = "run", setConnection }) {
         body.append(h("p", { class: "muted sm" }, d.title), h("ul", null, d.lines.map((l) => h("li", null, l))));
         break;
       case "report":
-        body.append(h("p", { class: "muted sm" }, `Findings are in the ${d.phase === "plan_check" ? "Plan fact check" : "Fact check"} card.`));
+        body.append(h("p", { class: "muted sm" }, `Findings are under ${d.phase === "plan_check" ? "Plan" : "Reflect"}.`));
         break;
       case "test": {
         if (d.failures?.length) body.append(h("ul", null, d.failures.map((f) => h("li", null, h("b", { class: "mono" }, `${f.checkId} `), f.message))));
@@ -512,15 +629,17 @@ export function mountRun(root, runId, { tab = "run", setConnection }) {
     }
   }
 
-  function evidenceTable(report) {
+  // compact: the Test panel shows raw evidence only for checks that didn't pass.
+  function evidenceTable(report, { compact = false } = {}) {
     const wrap = h("div", { class: "evidence-table" });
-    wrap.append(h("p", { class: "muted sm" }, `Tested by ${shortModelName(report.testerModel)} · candidate ${String(report.candidate || "").slice(0, 7)} · acceptance tests ${report.acceptanceIntact ? "intact" : "modified"}`));
+    if (!compact) wrap.append(h("p", { class: "muted sm" }, `Tested by ${shortModelName(report.testerModel)} · candidate ${String(report.candidate || "").slice(0, 7)} · acceptance tests ${report.acceptanceIntact ? "intact" : "modified"}`));
     for (const r of report.results || []) {
       const ev = r.evidence || {};
       const lines = [ev.command ? `$ ${ev.command.join(" ")}` : null, Number.isFinite(ev.exitCode) ? `exit code ${ev.exitCode}` : null, ev.stdoutTail ? ev.stdoutTail.trim() : null, ev.stderrTail ? ev.stderrTail.trim() : null, ...(ev.quotes || []).map((q) => `${q.file}: “${q.text}”`)].filter(Boolean);
+      const showLines = lines.length && (!compact || r.status !== "pass");
       wrap.append(h("div", { class: `ev-row ${r.status}` },
-        h("div", { class: "ev-head" }, h("span", { class: `verdict ${r.status === "pass" ? "fresh" : "stale"}` }, r.status), h("b", { class: "mono" }, r.checkId), h("span", null, r.message)),
-        lines.length ? h("pre", { class: "ev-pre" }, lines.join("\n")) : null));
+        h("div", { class: "ev-head" }, h("span", { class: `verdict ${r.status === "pass" ? "pass" : "fail"}` }, r.status === "pass" ? "Pass" : r.status === "fail" ? "Fail" : String(r.status || "?")), h("b", { class: "mono" }, r.checkId), h("span", null, r.message)),
+        showLines ? h("pre", { class: "ev-pre" }, lines.join("\n")) : null));
     }
     return wrap;
   }
@@ -573,6 +692,6 @@ export function mountRun(root, runId, { tab = "run", setConnection }) {
       if (stream) stream.close();
       if (setConnection) setConnection("", "muted");
     },
-    setTab(next) { if (ui.tab !== next) { ui.tab = next; runGrid = null; tl.map.clear(); stableTimeline.replaceChildren(); render(); } },
+    setTab(next) { if (ui.tab !== next) { ui.tab = next; runShell = null; tl.map.clear(); stableTimeline.replaceChildren(); render(); } },
   };
 }

@@ -42,35 +42,32 @@ export async function mountWish(root, { navigate }) {
     area,
     h("div", { class: "wish-foot" }, count, h("span", { class: "muted sm" }, "Ctrl+Enter to start")),
     error,
-    h("div", { class: "examples", role: "group", "aria-label": "Example wishes" }, h("span", { class: "muted sm" }, "Try one:"), EXAMPLES.map((ex) => h("button", { type: "button", class: "example", onclick: () => { area.value = ex; count.textContent = `${ex.length} / 2000`; area.focus(); } }, ex.length > 52 ? `${ex.slice(0, 50)}…` : ex))),
+    h("div", { class: "examples", role: "group", "aria-label": "Example wishes" }, h("span", { class: "muted sm" }, "Try:"), EXAMPLES.map((ex) => h("button", { type: "button", class: "example", onclick: () => { area.value = ex; count.textContent = `${ex.length} / 2000`; area.focus(); } }, ex.length > 46 ? `${ex.slice(0, 44)}…` : ex))),
     h("div", { class: "wish-actions" }, startBtn),
   );
 
-  const summary = h("div", { class: "wish-summary", "data-testid": "budget-summary" },
-    h("div", { class: "eyebrow" }, "What the harness may use"),
-    budget ? h("ul", { class: "budget-list" },
-      h("li", null, h("b", null, formatUsd(budget.maxUsdPerRun)), " at most in model costs"),
-      h("li", null, h("b", null, `${budget.maxMinutesPerRun} min`), " of run time"),
-      h("li", null, h("b", null, budget.maxBuildIterations), " build attempts in total")) : h("p", { class: "muted sm" }, "Budget unknown."),
-    h("p", { class: "muted sm" }, autonomy === "full" ? "Full autopilot: an independent model approves the plan. Nothing is asked of you during the run." : "You will be asked to confirm the plan before building starts."),
-    h("a", { class: "link", href: "#/routing" }, "Change budget and approval"));
+  // One quiet line next to Start: the limits this run may use and who approves the plan.
+  const summary = h("div", { class: "wish-summary", "data-testid": "budget-summary", title: autonomy === "full" ? "An independent model approves the plan. Nothing is asked of you during the run." : "You will be asked to confirm the plan before building starts." },
+    budget ? [
+      h("span", null, "Up to ", h("b", null, formatUsd(budget.maxUsdPerRun))),
+      h("span", null, `${budget.maxMinutesPerRun} min`),
+      h("span", null, `${budget.maxBuildIterations} build attempts`),
+    ] : h("span", null, "Budget unknown"),
+    h("span", null, autonomy === "full" ? "Full autopilot" : "You confirm the plan"),
+    h("a", { class: "link", href: "#/routing" }, "Change"));
+  form.querySelector(".wish-actions").prepend(summary);
 
-  const how = h("ol", { class: "how" },
-    h("li", null, h("b", null, "It researches"), " the web for what your wish needs."),
-    h("li", null, h("b", null, "It plans and fact-checks"), " the plan, then an independent model approves it."),
-    h("li", null, h("b", null, "It builds and tests"), " with separate models, retrying on stronger ones if a test fails."),
-    h("li", null, h("b", null, "You get the product"), " and an honest report, with costs and sources."));
+  const how = h("ol", { class: "how-line", "aria-label": "What happens next" },
+    h("li", null, h("b", null, "Research")), h("li", null, h("b", null, "Plan"), " and fact-check"), h("li", null, h("b", null, "Build"), " and test"), h("li", null, h("b", null, "Deliver"), " with a report"));
 
   const page = h("div", { class: "wish-page" },
-    h("div", { class: "wish-main" },
-      h("h1", { class: "hero" }, "What do you want made?"),
-      h("p", { class: "lead muted" }, "Describe it like you would to a friend. The harness does the rest without asking you anything."),
-      ready ? form : h("div", { class: "card empty-card", "data-testid": "no-models" },
-        h("h2", null, "Add a model provider to get started"),
-        h("p", { class: "muted" }, "The harness needs at least one model with an API key. Setup takes about a minute: pick a preset, paste the key, done."),
-        h("a", { class: "btn primary", href: "#/setup" }, "Open Setup")),
-    ),
-    h("aside", { class: "wish-side" }, summary, h("div", { class: "how-card" }, h("div", { class: "eyebrow" }, "What happens next"), how)));
+    h("h1", { class: "hero" }, "What do you want made?"),
+    h("p", { class: "lead muted" }, "Describe it like you would to a friend. The harness does the rest."),
+    ready ? form : h("div", { class: "card empty-card", "data-testid": "no-models" },
+      h("h2", null, "Add a model provider to get started"),
+      h("p", { class: "muted" }, "The harness needs at least one model with an API key. Pick a preset, paste the key, done."),
+      h("a", { class: "btn primary", href: "#/setup" }, "Open Setup")),
+    how);
   clear(root).append(page);
   if (ready) area.focus();
 }

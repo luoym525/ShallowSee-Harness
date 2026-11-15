@@ -60,11 +60,24 @@ try {
     await b.waitFor("document.querySelector('.runs-table tbody tr')");
     await shot("08-runs");
   }
-  if (wanted("light")) {
+  if (wanted("stages")) {
+    // The finished sample run, one loop stage at a time
     await b.go(url, "#/runs/" + mock.sampleRunId);
     await b.waitFor("document.querySelector('[data-testid=result-banner]')");
-    await b.evaluate(`document.documentElement.setAttribute('data-theme','light')`);
-    await shot("09-result-light-theme");
+    for (const [stage, name] of [["plan", "06b-stage-plan"], ["build", "06c-stage-build"], ["reflect", "06d-stage-reflect"]]) {
+      await b.evaluate(`document.querySelector('[data-stage-tab=${stage}]').click()`);
+      await sleep(400);
+      await shot(name, { full: true, height: 1100 });
+    }
+    await b.evaluate(`document.querySelector('[data-view-btn=models]').click()`);
+    await sleep(200);
+    await shot("06e-models");
+  }
+  if (wanted("dark")) {
+    await b.go(url, "#/runs/" + mock.sampleRunId);
+    await b.waitFor("document.querySelector('[data-testid=result-banner]')");
+    await b.evaluate(`document.documentElement.setAttribute('data-theme','dark')`);
+    await shot("09-result-dark-theme");
   }
   if (wanted("phone")) {
     await b.setViewport(390, 844, 2, true);
