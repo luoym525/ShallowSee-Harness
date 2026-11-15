@@ -221,6 +221,51 @@ try {
   await sleep(500);
   ok(mock.openStreams() === before, "…and leaving the run closes it");
 
+  // ---- Regression: keyboard repeats cannot submit two runs, and a stale response cannot navigate
+  await hash("#/new");
+  await b.waitFor("document.querySelector('#wish')");
+  const staleWish = "single-flight navigation regression";
+  await setValue("#wish", staleWish);
+  let startRequests = 0;
+  mock.setDelay((path, method) => {
+    if (path !== "/api/runs" || method !== "POST") return 0;
+    startRequests += 1;
+    return 900;
+  });
+  await b.evaluate(`(() => {
+    const wish = document.querySelector('#wish');
+    for (let i = 0; i < 2; i++) {
+      wish.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true, cancelable: true }));
+    }
+    location.hash = '#/setup';
+  })()`);
+  await b.waitFor("document.querySelector('[data-testid=provider-list]')");
+  await sleep(1100);
+  const matchingRuns = await b.evaluate(`fetch('/api/runs').then(r => r.json()).then(({ runs }) =>
+    runs.filter(run => run.wish === ${JSON.stringify(staleWish)}).length)`);
+  ok(startRequests === 1 && matchingRuns === 1, `A double Ctrl+Enter starts exactly one run (${startRequests} POSTs, ${matchingRuns} runs)`);
+  ok(await b.evaluate("location.hash === '#/setup'") && await exists(".provider-list"), "The delayed successful POST does not pull the user back to the run");
+  mock.setDelay(null);
+
+  // ---- A failed current-page start must re-enable the same wish for retry
+  await hash("#/new");
+  await b.waitFor("document.querySelector('#wish')");
+  await setValue("#wish", "start retry regression");
+  await b.evaluate(`(() => {
+    const originalFetch = window.fetch;
+    window.fetch = (path, options) => {
+      if (path !== '/api/runs' || options?.method !== 'POST') return originalFetch(path, options);
+      window.fetch = originalFetch;
+      return Promise.resolve(new Response(JSON.stringify({ error: { code: 'fixture_failure', message: 'Try the start again.' } }), { status: 503 }));
+    };
+  })()`);
+  await click("[data-testid=start]");
+  await b.waitFor("document.querySelector('.form-error:not([hidden])')?.textContent === 'Try the start again.'");
+  ok(await b.evaluate("!document.querySelector('[data-testid=start]').disabled"), "A failed start displays its error and re-enables the button");
+  await click("[data-testid=start]");
+  await b.waitFor("location.hash.startsWith('#/runs/hr-')");
+  ok(true, "Retrying the unchanged wish opens the new run");
+
   // ---- Runs list and theme toggle
   await hash("#/runs");
   await b.waitFor("document.querySelectorAll('.runs-table tbody tr').length >= 2");

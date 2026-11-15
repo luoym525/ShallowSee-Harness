@@ -25,15 +25,22 @@ export async function mountWish(root, { navigate, ticket }) {
   const startBtn = button("Start", { variant: "primary big", type: "submit", "data-testid": "start" }, "bolt");
   const error = h("p", { class: "form-error", role: "alert", hidden: true });
   area.addEventListener("input", () => { count.textContent = `${area.value.length} / 2000`; });
-  area.addEventListener("keydown", (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "Enter") form.requestSubmit(); });
+  area.addEventListener("keydown", (e) => {
+    if (!(e.ctrlKey || e.metaKey) || e.key !== "Enter") return;
+    e.preventDefault();
+    form.requestSubmit();
+  });
 
   const form = h("form", { class: "wish-form", onsubmit: async (e) => {
     e.preventDefault();
+    if (startBtn.disabled || !ticket.isCurrent()) return;
     const wish = area.value.trim();
     error.hidden = true;
     if (!wish) { error.textContent = "Type what you want first. A sentence is enough."; error.hidden = false; area.focus(); return; }
     startBtn.disabled = true;
+    const startHash = location.hash;
     const res = await post("/api/runs", { wish });
+    if (!ticket.isCurrent() || location.hash !== startHash) return;
     if (res.ok) { navigate(`#/runs/${res.data.runId}`); return; }
     startBtn.disabled = false;
     error.textContent = res.status === 409 ? "No models are set up yet. Add a provider on the Setup page first." : (res.error?.message || "Couldn't start the run.");
