@@ -106,4 +106,4 @@ node --test "apps/**/*.test.mjs" "eval/**/*.test.mjs" "packages/**/*.test.mjs" "
 - [harness/contracts/](harness/contracts/): module interfaces, run artifacts, events and the HTTP API
 - [docs/archive/README-earlier.md](docs/archive/README-earlier.md): the team's earlier design notes
 
-Built by Bill, LYM and Lynx, with a team of coding agents, at Imperial AI Hack 2026.
+Built by Bill, Yiming and Lynx, with a team of coding agents, at Imperial AI Hack 2026.
