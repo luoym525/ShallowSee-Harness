@@ -47,7 +47,7 @@ export function selectModel(req, roster, {
   if (!rolePolicy) throw new RouterError('no_match', 'No routing policy exists for this role.');
   const required = [...new Set([...rolePolicy.requires, ...needs])];
   const avoided = new Set(avoidModels);
-  let candidates = roster.filter(model =>
+  const candidates = roster.filter(model =>
     !avoided.has(model.ref) && required.every(capability => model.capabilities.includes(capability)));
   if (!candidates.length) throw new RouterError('no_match', 'No available model meets the requirements for ' + role + '.');
 
@@ -64,10 +64,12 @@ export function selectModel(req, roster, {
   const pinnedModel = pin && !pinIssue ? candidates.find(model => model.ref === pin) : null;
   const suggestedModel = attempt === 1 ? validSuggestion : null;
 
-  const otherVendors = preferVendorDiversity && avoidVendors.length
-    ? candidates.filter(model => !avoidVendors.includes(model.vendor)) : [];
-  if (otherVendors.length) candidates = otherVendors;
-  const ordered = orderCandidates(candidates, targetTier, rolePolicy);
+  const avoidedVendors = preferVendorDiversity ? new Set(avoidVendors) : new Set();
+  const diverseTiers = avoidedVendors.size
+    ? new Set(candidates.filter(model => !avoidedVendors.has(model.vendor)).map(model => model.tier))
+    : new Set();
+  const eligible = candidates.filter(model => !diverseTiers.has(model.tier) || !avoidedVendors.has(model.vendor));
+  const ordered = orderCandidates(eligible, targetTier, rolePolicy);
   const chosen = pinnedModel ?? suggestedModel ?? ordered[0];
   const fallbacks = ordered.filter(model => model.ref !== chosen.ref).slice(0, 2).map(model => model.ref);
 
@@ -90,7 +92,7 @@ export function selectModel(req, roster, {
   if (suggestedModel) return decision('builder.planner_suggested', 'Chosen by the planner: ' + chosen.label, { suggested: true });
   if (suggestionIssue) explanations.push('Planner suggested ' + suggestion + ', which ' + suggestionIssue);
   if (targetTier < increasedTier) explanations.push('Remaining budget is below $0.50, so the target is tier ' + targetTier);
-  if (otherVendors.length) explanations.push('Preferred a different vendor for an independent check');
+  if (diverseTiers.has(chosen.tier)) explanations.push('Preferred a different vendor within tier ' + chosen.tier);
   if (chosen.tier !== targetTier) explanations.push('No eligible tier-' + targetTier + ' model available, using tier ' + chosen.tier);
 
   const escalated = targetTier > initialTier;

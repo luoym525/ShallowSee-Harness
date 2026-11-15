@@ -130,12 +130,26 @@ test('explicit pins win only for configured, capable and allowed models', () => 
   assert(!avoided.fallbacks.includes(ref('sonnet')));
 });
 
-test('a tester selects an eligible different vendor when enabled and keeps same-vendor options otherwise', () => {
-  const anotherVendor = { ...roster[3], ref: 'local/independent', vendor: 'ollama', outputUsdPerMTok: null };
+test('vendor diversity chooses a different vendor within the selected tier', () => {
+  const anotherVendor = { ...roster[2], ref: 'local/independent', vendor: 'ollama', outputUsdPerMTok: null };
   const request = { role: 'tester', avoidModels: [ref('haiku')], avoidVendors: ['anthropic'] };
-  assert.equal(selectModel(request, [...roster, anotherVendor]).model, anotherVendor.ref);
+  const decision = selectModel(request, [...roster, anotherVendor]);
+  assert.equal(decision.model, anotherVendor.ref);
+  assert.equal(decision.tier, 2);
+  assert.match(decision.reason, /different vendor within tier 2/);
+  assert.deepEqual(decision.fallbacks, [ref('opus'), ref('fable')]);
   assert.equal(selectModel(request, roster).model, ref('sonnet'));
   assert.equal(selectModel(request, [...roster, anotherVendor], { preferVendorDiversity: false }).model, ref('sonnet'));
+});
+
+test('a different vendor at a lower tier does not displace the target tier', () => {
+  const cheaperVendor = { ...roster[3], ref: 'local/small', vendor: 'ollama', outputUsdPerMTok: null };
+  const request = { role: 'tester', avoidVendors: ['anthropic'] };
+  const decision = selectModel(request, [roster[2], cheaperVendor]);
+  assert.equal(decision.model, ref('sonnet'));
+  assert.equal(decision.tier, 2);
+  assert.deepEqual(decision.fallbacks, [cheaperVendor.ref]);
+  assert.doesNotMatch(decision.reason, /No eligible tier-2|different vendor/);
 });
 
 test('prefer capabilities before known price and break price ties by ref regardless of roster order', () => {

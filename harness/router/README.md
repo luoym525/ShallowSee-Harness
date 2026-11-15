@@ -14,7 +14,7 @@ The router builds a roster from the enabled configuration and selects a model fo
 | Reporter | 2 | JSON | | Cheapest | |
 | Vision | 2 | Vision | | Cheapest | |
 
-An eligible user pin overrides the default policy. An eligible planner suggestion picks the first builder and sets the starting tier for retries. Requested capabilities and per-call model exclusions apply to every pick. When requested, vendor diversity prefers an eligible model from another vendor. The router ranks exact tier matches first, followed by the nearest available tier with the higher tier first when distances tie. Within a tier, it compares preferred capabilities, known output price and then the model ref. For planner and reviewer the frozen policy uses higher known output price as a strength proxy.
+An eligible user pin overrides the default policy. An eligible planner suggestion picks the first builder and sets the starting tier for retries. Requested capabilities and per-call model exclusions apply to every pick. When requested, vendor diversity prefers an eligible model from another vendor within each tier. The router ranks exact tier matches first, followed by the nearest available tier with the higher tier first when distances tie. Within a tier, it compares preferred capabilities, known output price and then the model ref. For planner and reviewer the frozen policy uses higher known output price as a strength proxy.
 
 Below $0.50 remaining, the target is capped at tier 2 for default choices outside planner and reviewer. Capacity and cost reflect the checked-in catalog and configured overrides. Unlisted prices are unknown and can be supplied in the provider config.
 

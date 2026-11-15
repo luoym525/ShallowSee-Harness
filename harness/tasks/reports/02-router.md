@@ -6,13 +6,13 @@ Branch `lynx/02-router`. Implementation `4e1702cf4059a3ab641e96ce1c85e352e013b50
 
 - Builds the roster through the workstream 01 provider filter. Fills missing model fields from the catalog while preserving explicit settings, including unknown or zero prices.
 - Exports `DEFAULT_CATALOG`, `DEFAULT_POLICY`, `buildRoster`, `selectModel`, `describeRouting` and `RouterError` as specified in interfaces §2. The engine and CLI use these exports directly.
-- Implements per-role capability checks, user pins, builder suggestions, capability and tier ordering, bounded escalations, vendor diversity, and deterministic fallbacks. Hard capability requirements and model exclusions also apply to pins. When only Haiku is configured, eligible calls can use its lower tier. Calls that require reasoning return `no_match`.
+- Implements per-role capability checks, user pins, builder suggestions, capability and tier ordering, bounded escalations, vendor diversity, and deterministic fallbacks. Hard capability requirements and model exclusions also apply to pins. For review #399, the target tier precedes vendor diversity. The router filters vendors within each tier and keeps lower-tier alternatives available as fallbacks. When only Haiku is configured, eligible calls can use its lower tier. Calls that require reasoning return `no_match`.
 
 ## Verification
 
 ```text
 node --test "harness/router/**/*.test.mjs"
-tests 12, pass 12, fail 0, skipped 0
+tests 13, pass 13, fail 0, skipped 0
 
 node harness/bin/shallowsee.mjs config check --offline
 Configuration: valid
