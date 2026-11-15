@@ -182,7 +182,7 @@ interface FinalReview {
 ## `plan-check-v<N>.json` and `fact-check.json` — FactCheck (Shelf Life skill)
 
 Two uses of the same skill and format, each in its own child room:
-- **`plan_check`** (before plan review, once per spec version): the engine renders `plan-facts-v<N>.md` deterministically from the spec and research (no model): one Markdown line per checkable fact the plan relies on, i.e. each external service and endpoint, runtime and standard versions, documented limits, and every finding with its sources. The skill audits that document, and the result goes to the plan reviewer. This is the "verify the plan is current before development" step (room #216, #247, #268).
+- **`plan_check`** (before plan review, once per spec version): the engine renders `plan-facts-v<N>.md` deterministically from the spec and research (no model): one plain text line per checkable fact the plan relies on, i.e. each external service and endpoint, runtime and standard versions, documented limits, and every finding. Fact lines carry no Markdown decoration and no URL; sources go on separate `Source: <url>` lines after each fact (room #284: decorated lines or same-line URLs make Shelf Life's patch check fail). The skill audits that document, and the result goes to the plan reviewer. This is the "verify the plan is current before development" step (room #216, #247, #268).
 - **`fact_check`** (after final review): audits the delivered product's `README.md`.
 
 ```ts
