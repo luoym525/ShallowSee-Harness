@@ -102,6 +102,8 @@ class Run {
     this.stateQueue = Promise.resolve();
     this.pendingEmits = new Set();
     this.openTools = [];
+    this.planCorrections = new Map();   // stale fact line → { text, sources }, see plan-facts.mjs
+    this.lastItemReport = null;
 
     this.brief = null; this.research = null; this.spec = null; this.planReview = null; this.planCheck = null;
     this.approvedSpecVersion = null; this.workspace = null; this.acceptance = null; this.best = null;
@@ -572,9 +574,15 @@ class Run {
   async planCheckPhase(spec) {
     const n = spec.specVersion;
     const label = `plan-facts-v${n}.md`;
-    const markdown = renderPlanFacts(spec, this.research);
+    const markdown = renderPlanFacts(spec, this.research, { corrections: this.planCorrections });
     await this.writeArtifact(label, markdown);
-    return this.runSkill('plan_check', { label, markdown }, `plan-check-v${n}.json`);
+    const result = await this.runSkill('plan_check', { label, markdown }, `plan-check-v${n}.json`);
+    for (const f of confirmedStaleFindings(result)) {
+      if (typeof f.quote === 'string' && typeof f.correction === 'string' && f.correction.trim()) {
+        this.planCorrections.set(f.quote, { text: f.correction, sources: (f.sources ?? []).map(s => s.url).filter(Boolean) });
+      }
+    }
+    return result;
   }
 
   /**
@@ -725,6 +733,10 @@ class Run {
     itemState.attempts++;
     itemState.status = 'building';
     const version = this.spec.specVersion;
+    if (this.best?.itemId !== item.id || (iterate && !this.best?.iterating)) {
+      await this.startItemBaseline(item, { iterate });
+      if (iterate) this.best.iterating = true;
+    }
     await this.setPhase('build', item.id);
     await this.emit('task.updated', { status: 'running', version, note: iterate ? 'final review iteration' : `attempt ${attempt}` }, { taskId: item.id });
 
@@ -760,8 +772,9 @@ class Run {
     const reportRel = `tests/${pad(++this.counters.test, 3)}.json`;
     await this.recordTest(report, reportRel, item.id);
     itemState.lastScore = typeof report.score === 'number' ? report.score : null;
-    await this.keepBest(report, item.id, build);
-    const itemPassed = itemChecksPass(report, item.id, this.spec);
+    const kept = await this.keepBest(report, item.id, build);
+    if (!kept.reverted) this.lastItemReport = report;
+    const itemPassed = itemChecksPass(report, item.id, this.spec) && !kept.reverted;
     if (itemPassed) {
       await this.emit('task.done', {
         verifiedBy: 'check', version,
@@ -836,18 +849,38 @@ class Run {
   async keepBest(report, itemId, build) {
     const score = typeof report.score === 'number' ? report.score : 0;
     const prev = this.best;
-    if (prev && prev.itemId === itemId && score < prev.score && prev.commit) {
+    // Never run git while a builder or tester call is pending: both have settled here (afterCall ran).
+    if (prev && prev.commit && typeof prev.score === 'number' && score < prev.score) {
       await this.workspace.git.resetHard(prev.commit);
       await this.emit('harness.candidate.best', {
         commit: prev.commit, score: prev.score, previousBest: prev.score, reverted: true, itemId,
         rejected: { commit: report.candidate ?? build?.commit ?? null, score },
       });
-      return;
+      return { reverted: true };
     }
     const commit = (await this.workspace.git.head()) ?? report.candidate ?? build?.commit ?? null;
     this.best = { commit, score, itemId };
-    this.state.best = { commit, score, itemId };
+    this.state.best = { commit, score };
     await this.emit('harness.candidate.best', { commit, score, previousBest: prev?.score ?? null, reverted: false, itemId });
+    return { reverted: false };
+  }
+
+  /**
+   * The state before an item's first attempt is the baseline "best": earlier items' checks that passed in the last
+   * report, over the checks in scope for this item (its own checks fail until built). null when nothing is comparable.
+   */
+  async startItemBaseline(item, { iterate }) {
+    const commit = await this.workspace.git.head();
+    let score = null;
+    if (!iterate) {
+      const order = orderItems(this.spec.workItems).map(i => i.id);
+      const prior = new Set(order.slice(0, order.indexOf(item.id)));
+      const priorChecks = (this.spec.acceptance ?? []).filter(c => prior.has(c.itemId)).length;
+      const own = (this.spec.acceptance ?? []).filter(c => c.itemId === item.id).length;
+      const passedPrior = (this.lastItemReport?.results ?? []).filter(r => prior.has(r.itemId) && r.status === 'pass').length;
+      if (priorChecks > 0 && this.lastItemReport) score = passedPrior / (priorChecks + own);
+    }
+    this.best = { commit, score, itemId: item.id, baseline: true };
   }
 
   async finalize() {
@@ -857,6 +890,7 @@ class Run {
       ? orderItems(this.spec.workItems).filter(i => this.finalReview.iterateItems.includes(i.id)) : [];
     if (iterateIds.length && !this.iterated) {
       this.iterated = true;
+      const before = { report: this.finalReport, review: this.finalReview, commit: await this.workspace.git.head() };
       const gaps = (this.finalReview.gaps ?? []).join('\n');
       for (const item of iterateIds) {
         const attempt = Math.min((this.state.items[item.id]?.attempts ?? 0) + 1, MAX_ATTEMPTS);
@@ -864,7 +898,22 @@ class Run {
         if (cycle.decision === 'stop' && this.limitHit) throw new LimitExceededError(this.limitHit);
       }
       await this.finalTest();
-      await this.finalReviewPhase();
+      const prevScore = typeof before.report?.score === 'number' ? before.report.score : null;
+      const newScore = typeof this.finalReport?.score === 'number' ? this.finalReport.score : 0;
+      if (prevScore !== null && newScore < prevScore && before.commit) {
+        // Keep-best: the iterate pass made the product worse, so deliver the earlier candidate with its own review.
+        await this.workspace.git.resetHard(before.commit);
+        await this.emit('harness.candidate.best', {
+          commit: before.commit, score: prevScore, previousBest: prevScore, reverted: true, itemId: null,
+          rejected: { commit: this.finalReport?.candidate ?? null, score: newScore },
+        });
+        this.finalReport = before.report;
+        this.finalReview = before.review;
+        await this.writeArtifact('tests/final.json', json(before.report), 'report');
+        if (before.review) await this.writeArtifact('final-review.json', json(before.review));
+      } else {
+        await this.finalReviewPhase();
+      }
     }
     await this.factCheckPhase();
   }

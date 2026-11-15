@@ -83,7 +83,7 @@ export function collectPlanFacts(spec, research) {
 }
 
 /** renderPlanFacts(spec, research) → Markdown text for plan-facts-v<N>.md (deterministic). */
-export function renderPlanFacts(spec, research) {
+export function renderPlanFacts(spec, research, { corrections } = {}) {
   const version = Number.isSafeInteger(spec?.specVersion) ? spec.specVersion : 1;
   const title = plainFactLine(spec?.title) || 'Untitled plan';
   const stack = spec?.stack === 'node' ? 'Node.js scripts using only built-in modules'
@@ -97,7 +97,13 @@ export function renderPlanFacts(spec, research) {
   const out = [...header];
   let bytes = Buffer.byteLength(out.join('\n'));
   let included = 0;
-  const facts = collectPlanFacts(spec, research);
+  // A fact that an earlier plan check found stale (two sources, proposed correction) is replaced by the corrected
+  // line and its cited sources. Research.json is fixed after the research phase, so without this a stale research
+  // finding would be flagged again on every revision and the plan could never be approved.
+  const facts = collectPlanFacts(spec, research).map(f => {
+    const fix = corrections?.get(f.text);
+    return fix ? { ...f, text: fix.text, sources: fix.sources } : f;
+  });
   for (const fact of facts) {
     const block = [fact.text, ...fact.sources.map(url => `Source: ${url}`), ''];
     const size = Buffer.byteLength(block.join('\n') + '\n');
