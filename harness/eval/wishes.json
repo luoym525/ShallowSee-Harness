@@ -1,0 +1,255 @@
+[
+  {
+    "id": "times-table",
+    "wish": "I need a little terminal tool to practise multiplication. I want to pass 7 as its only argument and see the seven times table from 1 through 12. Please write each line like 7 x 1 = 7.",
+    "expectedStack": "node",
+    "checks": [
+      {
+        "id": "table-ends",
+        "itemId": "held-out",
+        "description": "Show the first six complete rows of the seven times table.",
+        "type": "command",
+        "run": [
+          "node",
+          "$entry",
+          "7"
+        ],
+        "generate": false,
+        "expectExitCode": 0,
+        "expectStdoutIncludes": [
+          "7 x 1 = 7",
+          "7 x 2 = 14",
+          "7 x 3 = 21",
+          "7 x 4 = 28",
+          "7 x 5 = 35",
+          "7 x 6 = 42"
+        ],
+        "timeoutMs": 5000
+      },
+      {
+        "id": "table-late-rows",
+        "itemId": "held-out",
+        "description": "Calculate every row from seven through twelve.",
+        "type": "command",
+        "run": [
+          "node",
+          "$entry",
+          "7"
+        ],
+        "generate": false,
+        "expectExitCode": 0,
+        "expectStdoutIncludes": [
+          "7 x 7 = 49",
+          "7 x 8 = 56",
+          "7 x 9 = 63",
+          "7 x 10 = 70",
+          "7 x 11 = 77",
+          "7 x 12 = 84"
+        ],
+        "timeoutMs": 5000
+      }
+    ]
+  },
+  {
+    "id": "tip-calculator",
+    "wish": "I want a small page I can open on my phone to split a restaurant bill. Let me enter the bill amount, a tip percentage, and how many people are paying, then tell me what each person pays and the total with tip.",
+    "expectedStack": "static-web",
+    "checks": [
+      {
+        "id": "tip-controls",
+        "itemId": "held-out",
+        "description": "Show the bill, tip and people fields in the entry page.",
+        "type": "file",
+        "path": "$entry",
+        "mustMatch": "[Bb]ill"
+      },
+      {
+        "id": "tip-people",
+        "itemId": "held-out",
+        "description": "Make the split visible on the entry page.",
+        "type": "file",
+        "path": "$entry",
+        "mustMatch": "[Pp]eople|[Pp]erson|[Gg]uests"
+      },
+      {
+        "id": "tip-total",
+        "itemId": "held-out",
+        "description": "Explain the total or amount each person pays.",
+        "type": "file",
+        "path": "$entry",
+        "mustMatch": "[Tt]otal|[Pp]er person|[Ee]ach pays"
+      }
+    ]
+  },
+  {
+    "id": "unit-converter",
+    "wish": "I want a terminal unit converter for kilometres to miles and Celsius to Fahrenheit. I'll use it with two arguments, like km-to-mi 10 or c-to-f 0. Show the converted number, round miles to two decimal places, and if the number is wrong tell me it was invalid instead of showing a nonsense answer.",
+    "expectedStack": "node",
+    "checks": [
+      {
+        "id": "milestone-mi",
+        "itemId": "held-out",
+        "description": "Convert a different nonzero distance.",
+        "type": "command",
+        "run": [
+          "node",
+          "$entry",
+          "km-to-mi",
+          "25"
+        ],
+        "generate": false,
+        "expectExitCode": 0,
+        "expectStdoutIncludes": [
+          "15.53"
+        ],
+        "timeoutMs": 5000
+      },
+      {
+        "id": "milestone-cold",
+        "itemId": "held-out",
+        "description": "Convert a signed Celsius value.",
+        "type": "command",
+        "run": [
+          "node",
+          "$entry",
+          "c-to-f",
+          "-10"
+        ],
+        "generate": false,
+        "expectExitCode": 0,
+        "expectStdoutIncludes": [
+          "14"
+        ],
+        "timeoutMs": 5000
+      },
+      {
+        "id": "invalid-input",
+        "itemId": "held-out",
+        "description": "Reject invalid numeric input with a nonzero exit.",
+        "type": "command",
+        "run": [
+          "node",
+          "$entry",
+          "km-to-mi",
+          "oops"
+        ],
+        "generate": false,
+        "expectExitCode": 1,
+        "expectStdoutIncludes": [],
+        "timeoutMs": 5000
+      }
+    ]
+  },
+  {
+    "id": "london-umbrella",
+    "wish": "Make a one-page tool that tells me whether to take an umbrella in London tomorrow. Show the forecast date, the rain chance and a plain-language recommendation. Use Open-Meteo so I can use it without an account or API key, and tell me when the forecast can't be loaded.",
+    "expectedStack": "static-web",
+    "checks": [
+      {
+        "id": "umbrella-location",
+        "itemId": "held-out",
+        "description": "Show the forecast location.",
+        "type": "file",
+        "path": "$entry",
+        "mustMatch": "[Ll]ondon"
+      },
+      {
+        "id": "umbrella-horizon",
+        "itemId": "held-out",
+        "description": "Explain the forecast horizon.",
+        "type": "file",
+        "path": "$entry",
+        "mustMatch": "[Tt]omorrow"
+      },
+      {
+        "id": "umbrella-advice",
+        "itemId": "held-out",
+        "description": "Identify the information users use to decide.",
+        "type": "file",
+        "path": "$entry",
+        "mustMatch": "[Uu]mbrella|[Rr]ain"
+      }
+    ]
+  },
+  {
+    "id": "persistent-todo",
+    "wish": "Give me a little to-do page to add tasks, mark them done, and remove them. I want my tasks to still be there when I close and reopen the page in the same browser. A short hint about how the page saves the list would help.",
+    "expectedStack": "static-web",
+    "checks": [
+      {
+        "id": "todo-add",
+        "itemId": "held-out",
+        "description": "Show a control for adding an item.",
+        "type": "file",
+        "path": "$entry",
+        "mustMatch": "[Aa]dd(?:\\s+(?:a|new))?\\s*(?:[Tt]ask|[Ii]tem)?"
+      },
+      {
+        "id": "todo-list",
+        "itemId": "held-out",
+        "description": "Identify the task list or to-do workflow.",
+        "type": "file",
+        "path": "$entry",
+        "mustMatch": "[Tt]o[\\s-]?[Dd]o|[Tt]asks"
+      },
+      {
+        "id": "todo-storage-hint",
+        "itemId": "held-out",
+        "description": "Explain that the browser keeps tasks.",
+        "type": "file",
+        "path": "$entry",
+        "mustMatch": "[Ss]av(?:e|ed|es)|[Bb]rowser|[Ll]ocal storage"
+      }
+    ]
+  },
+  {
+    "id": "csv-stats",
+    "wish": "I need a terminal tool that takes the path to a CSV as its sole argument. The first row is the column name. Show the count, mean, minimum and maximum for each numeric column, ignoring blank or non-numeric cells. Label the results Count, Mean, Min, and Max and show the mean rounded to two decimals.",
+    "expectedStack": "node",
+    "checks": [
+      {
+        "id": "csv-two-columns",
+        "itemId": "held-out",
+        "description": "Run the program on a hand-written CSV with blanks and a text-only column.",
+        "type": "command",
+        "run": [
+          "node",
+          "$entry",
+          "$fixture:stats.csv"
+        ],
+        "generate": false,
+        "expectExitCode": 0,
+        "expectStdoutIncludes": [
+          "2",
+          "4.00",
+          "1",
+          "7"
+        ],
+        "timeoutMs": 5000
+      },
+      {
+        "id": "csv-signed",
+        "itemId": "held-out",
+        "description": "Check a second CSV with negative numbers.",
+        "type": "command",
+        "run": [
+          "node",
+          "$entry",
+          "$fixture:signed.csv"
+        ],
+        "generate": false,
+        "expectExitCode": 0,
+        "expectStdoutIncludes": [
+          "-3.00",
+          "-9",
+          "3"
+        ],
+        "timeoutMs": 5000
+      }
+    ],
+    "fixtures": {
+      "stats.csv": "score,label,time\n1,early,3\n7,late,\n,middle,14\n",
+      "signed.csv": "sample\n-9\n3\n"
+    }
+  }
+]
