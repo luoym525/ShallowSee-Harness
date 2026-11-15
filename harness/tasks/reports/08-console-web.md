@@ -24,16 +24,16 @@ node harness/console/web/dev/screenshots.mjs        # regenerate screenshots/
 
 ### `node --test "harness/console/web/**/*.test.mjs"` (real output, summary)
 ```
-# tests 42
+# tests 46
 # suites 0
-# pass 42
+# pass 46
 # fail 0
 # cancelled 0
 # skipped 0
 # todo 0
 # duration_ms (about 20 s)
 ```
-The 42 tests:
+The 46 tests:
 ```
 dev/mock-server.test.mjs (13)
   serves the web UI and falls back to index.html for hash-route paths; dev files stay private
@@ -80,9 +80,14 @@ model.test.mjs (22)
   fetch-models results map to distinct plain-English outcomes and always keep the configured models
   hasUsableModels and preset order
   a skipped skill (childRoomId null) pairs started with completed: one entry per invocation, none stuck at running
+ui/nav.test.mjs (4)
+  navigator: a new navigation aborts the previous one and only the newest ticket is current
+  regression: an older slow load (Setup) cannot overwrite a newer page (Make a wish)
+  regression: a run screen unmounted before its first GET returns never opens the stream
+  connectAfterLoad: normal order is load → onLoaded → open once; a 404 stops before opening
 ```
 
-### `node harness/console/web/dev/ui-smoke.mjs` (real output; headless Edge, 52 checks, exit code 0)
+### `node harness/console/web/dev/ui-smoke.mjs` (real output; headless Edge, 57 checks, exit code 0)
 ```
 PASS  Setup lists 4 provider cards
 PASS  Anthropic card shows the key preview sk-…ab12
@@ -134,6 +139,11 @@ PASS  Expanding a failed test shows the tester's evidence
 PASS  Report renders as safe Markdown with its sections
 PASS  File browser opens a product file
 PASS  Runs history marks synthetic runs
+PASS  A slow older Setup load does not overwrite the newer Runs page
+PASS  …and the page still reads Runs
+PASS  Leaving the run before its first GET returned opened no stream (0 open, 0 before)
+PASS  A normal visit to the live run opens exactly one stream
+PASS  …and leaving the run closes it
 PASS  Theme toggle switches dark → light
 PASS  No browser console errors
 
@@ -144,9 +154,15 @@ The smoke test found two real bugs while I built it, both fixed: DELETE sent no 
 ## Review fix (room #368)
 A skipped skill has `childRoomId: null`, so `harness.skill.started` and `harness.skill.completed` could not be paired by room and `planChecks` showed two entries (one stuck at "running"). `model.mjs` now pairs each completed event with the most recent unpaired (still running) started event of the same `skillId` and `phase` when there is no matching `childRoomId`, and an unpaired completed event still yields an entry. Regression test: skipped plan_check (two invocations) and skipped fact_check, an orphan completed event, and a skipped invocation interleaved with a normal one that has a child room.
 
+## Review fix 2 (room #379): stale route loads and a leaked stream
+1. **Stale page overwrite.** Every navigation now gets a ticket from `ui/nav.mjs` (a generation counter plus an `AbortController`): starting a new navigation aborts the previous page's pending fetches and marks it stale, and each mount checks `ticket.isCurrent()` after its awaits before touching the DOM. `app.js` also gives every navigation its own fresh root element, so a load that still finishes late can only write into a detached node.
+2. **Run unmounted before its first GET returns.** `run.mjs` now has an `AbortController` aborted on unmount (it cancels the first GET and every other pending fetch of that screen), and the initial "load, then follow the stream" order lives in `ui/session.mjs` (`connectAfterLoad`): if the signal is aborted before or during the load, the EventSource is never created.
+
+Regression tests: `ui/nav.test.mjs` (the two helpers, including the exact stale-load and unmount-before-GET orderings) and two end-to-end checks in `dev/ui-smoke.mjs` using the mock's new `setDelay` and `openStreams` hooks (a slow Setup load followed by Runs; a run left before its first GET returns, counted on the server). I ran the same smoke test against the pre-fix UI files: it FAILED 5 checks (Setup overwrote Runs; one stream left open), and passes all 57 on the fix. The first version of the stale-load test passed on the old code because Chrome queued two identical `/api/config` requests, so the test now uses different URLs for the slow and the new page.
+
 ## Definition of Done
 - [x] All six screens work against the mock server; English everywhere (click-through above).
-- [x] `node --test "harness/console/web/**/*.test.mjs"` passes (42/42, summary above).
+- [x] `node --test "harness/console/web/**/*.test.mjs"` passes (46/46, summary above).
 - [x] The synthetic fixture is labelled in the UI: **Synthetic replay** chip on the run page, "Synthetic" tag in Runs, a banner on the Report tab; the fixture itself is marked `synthetic: true`.
 - [x] Screenshots in `harness/console/web/screenshots/` (1280×720 unless noted; synthetic data):
   - `01-setup-providers.png` Setup (list) · `02-add-provider.png` Add provider (Anthropic preset picked) and `02b-add-provider-full.png` (full page, shows Models)

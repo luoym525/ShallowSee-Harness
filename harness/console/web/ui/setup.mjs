@@ -60,12 +60,13 @@ export async function openFetchDialog({ provider, existingIds = [], onAdd }) {
 
 // ---------------------------------------------------------------- providers list
 
-export async function mountSetup(root, { navigate }) {
+export async function mountSetup(root, { navigate, ticket }) {
   clear(root).append(h("p", { class: "muted pad" }, "Loading providers…"));
-  const cfg = await get("/api/config");
+  const cfg = await get("/api/config", { signal: ticket.signal });
+  if (!ticket.isCurrent()) return; // a newer page took over while this load was in flight
   const page = h("div", { class: "page-narrow" });
   if (!cfg.ok) {
-    page.append(setupTabs("providers"), h("div", { class: "card empty-card" }, h("h2", null, "Couldn't load your setup"), h("p", { class: "muted" }, cfg.error?.message || ""), button("Try again", { variant: "primary", onclick: () => mountSetup(root, { navigate }) })));
+    page.append(setupTabs("providers"), h("div", { class: "card empty-card" }, h("h2", null, "Couldn't load your setup"), h("p", { class: "muted" }, cfg.error?.message || ""), button("Try again", { variant: "primary", onclick: () => mountSetup(root, { navigate, ticket }) })));
     clear(root).append(page);
     return;
   }
@@ -169,9 +170,10 @@ const ROLE_HELP = {
   vision: "Looks at screenshots (optional)",
 };
 
-export async function mountRouting(root, { navigate }) {
+export async function mountRouting(root, { navigate, ticket }) {
   clear(root).append(h("p", { class: "muted pad" }, "Loading routing…"));
-  const [cfg, prev] = await Promise.all([get("/api/config"), get("/api/routing/preview")]);
+  const [cfg, prev] = await Promise.all([get("/api/config", { signal: ticket.signal }), get("/api/routing/preview", { signal: ticket.signal })]);
+  if (!ticket.isCurrent()) return;
   const page = h("div", { class: "page-narrow" });
   if (!cfg.ok) {
     add(page, setupTabs("routing"), h("div", { class: "card empty-card" }, h("h2", null, "Couldn't load your setup"), h("p", { class: "muted" }, cfg.error?.message || "")));

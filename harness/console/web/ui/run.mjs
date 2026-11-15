@@ -9,6 +9,7 @@ import {
 import { renderMarkdown } from "../markdown.mjs";
 import { h, svg, icon, chip, button, clear, setMarkdown, toast, onReducedMotion, add } from "./dom.mjs";
 import { get, post, artifactPath, filePath, previewUrl, followRun } from "./api.mjs";
+import { connectAfterLoad } from "./session.mjs";
 
 const STAGE_INFO = {
   plan: { label: "Plan", blurb: "Research, plan, check the plan's facts, independent approval" },
@@ -22,6 +23,9 @@ export function mountRun(root, runId, { tab = "run", setConnection }) {
   const ui = { showTools: false, open: new Set(), reports: new Map(), loading: new Set(), serverState: null, artifacts: [], notFound: false, streamState: "connecting", files: null, fileView: null, reportMd: undefined, tab };
   let raf = 0;
   let stream = null;
+  let unmounted = false;
+  const ac = new AbortController(); // aborted on unmount: cancels every pending fetch of this screen
+  const sget = (path) => get(path, { signal: ac.signal });
   let ticker = null;
   const tl = { map: new Map() };
 
@@ -38,27 +42,25 @@ export function mountRun(root, runId, { tab = "run", setConnection }) {
   const timelineCard = buildTimelineCard();
 
   // ---------------------------------------------------------------- data
-  (async () => {
-    const res = await get(`/api/runs/${encodeURIComponent(runId)}`);
-    if (res.ok) {
-      ui.serverState = res.data.state;
-      ui.artifacts = res.data.artifacts || [];
-    } else if (res.status === 404) {
-      ui.notFound = true;
+  connectAfterLoad({
+    signal: ac.signal,
+    load: (signal) => get(`/api/runs/${encodeURIComponent(runId)}`, { signal }),
+    onLoaded: (res) => {
+      if (res.ok) { ui.serverState = res.data.state; ui.artifacts = res.data.artifacts || []; }
+      else if (res.status === 404) { ui.notFound = true; }
       render();
-      return;
-    }
-    render();
-    stream = followRun(runId, {
+      return !ui.notFound;
+    },
+    openStream: () => followRun(runId, {
       getLastSeq: () => view.lastSeq,
       onEvent: (env) => { applyEvent(view, env); schedule(); },
       onState: (s) => { ui.streamState = s; updateConnection(); schedule(); },
-    });
-  })();
+    }),
+  }).then(({ stream: opened }) => { stream = opened; if (unmounted && stream) { stream.close(); stream = null; } });
   ticker = setInterval(updateClock, 1000);
 
   function updateConnection() {
-    if (!setConnection) return;
+    if (!setConnection || unmounted) return;
     if (ui.streamState === "live") setConnection(isFinishedStatus(view.status) ? "Run finished" : "Live", isFinishedStatus(view.status) ? "muted" : "good");
     else if (ui.streamState === "ended") setConnection("Run finished", "muted");
     else setConnection("Reconnecting…", "warn");
@@ -67,7 +69,7 @@ export function mountRun(root, runId, { tab = "run", setConnection }) {
   // Render at most once per frame. A timeout backs up requestAnimationFrame, which never fires in a hidden tab.
   let timer = 0;
   function schedule() {
-    if (raf || timer) return;
+    if (unmounted || raf || timer) return;
     const run = () => {
       if (!raf && !timer) return;
       cancelAnimationFrame(raf); clearTimeout(timer); raf = 0; timer = 0;
@@ -84,7 +86,8 @@ export function mountRun(root, runId, { tab = "run", setConnection }) {
     for (const name of wanted) {
       if (ui.reports.has(name) || ui.loading.has(name)) continue;
       ui.loading.add(name);
-      get(artifactPath(runId, name)).then((res) => {
+      sget(artifactPath(runId, name)).then((res) => {
+        if (res.aborted || unmounted) return;
         ui.loading.delete(name);
         ui.reports.set(name, res.ok && res.data ? res.data : null);
         schedule();
@@ -504,7 +507,7 @@ export function mountRun(root, runId, { tab = "run", setConnection }) {
         body.append(holder);
         if (d.reportPath) {
           holder.append(h("p", { class: "muted sm" }, "Loading the test evidence…"));
-          get(artifactPath(runId, d.reportPath)).then((res) => { clear(holder); if (res.ok && res.data) holder.append(evidenceTable(res.data)); else holder.append(h("p", { class: "muted sm" }, "The test report isn't available.")); });
+          sget(artifactPath(runId, d.reportPath)).then((res) => { if (res.aborted || unmounted) return; clear(holder); if (res.ok && res.data) holder.append(evidenceTable(res.data)); else holder.append(h("p", { class: "muted sm" }, "The test report isn't available.")); });
         }
         break;
       }
@@ -530,7 +533,7 @@ export function mountRun(root, runId, { tab = "run", setConnection }) {
     if (ui.reportMd === undefined) {
       ui.reportMd = null;
       clear(els.body).append(h("p", { class: "muted pad" }, "Loading the report…"));
-      get(artifactPath(runId, "REPORT.md")).then((res) => { ui.reportMd = res.ok ? res.text : false; render(); });
+      sget(artifactPath(runId, "REPORT.md")).then((res) => { if (res.aborted || unmounted) return; ui.reportMd = res.ok ? res.text : false; render(); });
       return;
     }
     if (ui.reportMd === null) return;
@@ -545,7 +548,7 @@ export function mountRun(root, runId, { tab = "run", setConnection }) {
     const body = clear(els.body);
     if (ui.files === null) {
       ui.files = { product: undefined };
-      get(`/api/runs/${encodeURIComponent(runId)}/files`).then((res) => { ui.files = { product: res.ok ? res.data.files || [] : [] }; render(); });
+      sget(`/api/runs/${encodeURIComponent(runId)}/files`).then((res) => { if (res.aborted || unmounted) return; ui.files = { product: res.ok ? res.data.files || [] : [] }; render(); });
       body.append(h("p", { class: "muted pad" }, "Loading files…"));
       return;
     }
@@ -556,7 +559,8 @@ export function mountRun(root, runId, { tab = "run", setConnection }) {
       ui.fileView = { text: "Loading…" };
       viewer.textContent = "Loading…";
       title.textContent = label;
-      const res = await get(url);
+      const res = await sget(url);
+      if (res.aborted || unmounted) return;
       viewer.textContent = res.ok ? (res.text ?? "") : res.status === 415 ? "This file isn't text, so it can't be shown here." : "Couldn't load this file.";
     };
     const title = h("div", { class: "file-title mono" }, "No file selected");
@@ -568,6 +572,8 @@ export function mountRun(root, runId, { tab = "run", setConnection }) {
 
   return {
     unmount() {
+      unmounted = true;
+      ac.abort(); // cancels the first GET and every other pending fetch; connectAfterLoad then never opens the stream
       cancelAnimationFrame(raf); clearTimeout(timer);
       clearInterval(ticker);
       if (stream) stream.close();

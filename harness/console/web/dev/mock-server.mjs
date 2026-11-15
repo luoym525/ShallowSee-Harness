@@ -76,6 +76,8 @@ export function createMockServer(opts = {}) {
   let config = seedConfig();
   const runs = new Map();
   const sockets = new Set();
+  let openStreams = 0; // live SSE connections, so tests can prove a screen left none behind
+  let delayFor = null; // test hook: (pathname, method) => ms to hold an API response
 
   // ------------------------------------------------------------ runs
   function addRun(id) {
@@ -254,7 +256,9 @@ export function createMockServer(opts = {}) {
     let after = Number.isFinite(last) && last > 0 ? last : Number(afterQuery) || 0;
     res.writeHead(200, { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-store", Connection: "keep-alive", "X-Accel-Buffering": "no" });
     res.write(": connected\n\n");
-    const write = (env) => { if (env.seq > after) { after = env.seq; res.write(`id: ${env.seq}\nevent: harness\ndata: ${JSON.stringify(env)}\n\n`); } };
+    openStreams += 1;
+    res.on("close", () => { openStreams -= 1; });
+    const write =(env) => { if (env.seq > after) { after = env.seq; res.write(`id: ${env.seq}\nevent: harness\ndata: ${JSON.stringify(env)}\n\n`); } };
     const finish = () => { res.write("event: end\ndata: {}\n\n"); res.end(); };
     for (const env of run.events) write(env);
     if (run.closed) return finish();
@@ -268,6 +272,8 @@ export function createMockServer(opts = {}) {
   async function handleApi(req, res, url) {
     const path = url.pathname;
     const method = req.method;
+    const hold = delayFor ? delayFor(path, method) : 0;
+    if (hold) await new Promise((r) => setTimeout(r, hold));
     let m;
     if (method !== "GET" && method !== "HEAD") {
       if (!/^application\/json/i.test(req.headers["content-type"] || "")) return fail(res, 415, "unsupported_media_type", "Send JSON with Content-Type: application/json.");
@@ -432,6 +438,8 @@ export function createMockServer(opts = {}) {
 
   return {
     sampleRunId: SAMPLE_ID,
+    openStreams: () => openStreams,
+    setDelay(fn) { delayFor = fn; },
     async listen(port = Number(process.env.PORT ?? 4320), previewPort = Number(process.env.PREVIEW_PORT ?? 4321)) {
       await new Promise((r) => control.listen(port, "127.0.0.1", r));
       await new Promise((r) => preview_.listen(previewPort, "127.0.0.1", r));

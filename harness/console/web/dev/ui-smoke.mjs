@@ -175,6 +175,40 @@ try {
   await b.waitFor("document.querySelector('[data-testid=file-view]').innerText.includes('Take an umbrella')");
   ok(true, "File browser opens a product file");
 
+  // ---- Regression: a slow older page load must not overwrite a newer page (reviewer P2, room #379)
+  // Setup is slow (its /api/config answer is held for 1.8 s); the user moves on to Runs, which loads from a different URL right away.
+  await hash("#/new");
+  await b.waitFor("document.querySelector('#wish')");
+  mock.setDelay((path) => (path === "/api/config" ? 1800 : 0));
+  await b.evaluate("location.hash = '#/setup'");
+  await sleep(150);
+  await b.evaluate("location.hash = '#/runs'");
+  await b.waitFor("document.querySelector('.runs-table')");
+  await sleep(2400); // the stale Setup load answers now; before the fix it replaced the Runs page
+  ok(await exists(".runs-table") && !(await exists(".provider-list")), "A slow older Setup load does not overwrite the newer Runs page");
+  ok((await text("h1")).trim() === "Runs", "…and the page still reads Runs");
+  mock.setDelay(null);
+
+  // ---- Regression: leaving a run before its first GET returns must not leave an EventSource open (reviewer P2, room #379)
+  const liveId = await b.evaluate(`fetch('/api/runs', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({wish:'regression'})}).then(r => r.json()).then(j => j.runId)`);
+  await sleep(600);
+  const before = mock.openStreams();
+  mock.setDelay((path) => (/^\/api\/runs\/hr-[0-9]{8}-[0-9]{6}-[a-z0-9]{4}$/.test(path) ? 1500 : 0)); // slow first GET of the run
+  await b.evaluate(`location.hash = '#/runs/${liveId}'`);
+  await sleep(200);
+  await b.evaluate("location.hash = '#/new'"); // unmount while that GET is still in flight
+  await b.waitFor("document.querySelector('#wish')");
+  await sleep(2600);
+  ok(mock.openStreams() === before, `Leaving the run before its first GET returned opened no stream (${mock.openStreams()} open, ${before} before)`);
+  mock.setDelay(null);
+  await b.evaluate(`location.hash = '#/runs/${liveId}'`); // and a normal visit still streams
+  await b.waitFor("document.querySelector('[data-testid=whos-working]')");
+  await sleep(500);
+  ok(mock.openStreams() === before + 1, "A normal visit to the live run opens exactly one stream");
+  await b.evaluate("location.hash = '#/new'");
+  await sleep(500);
+  ok(mock.openStreams() === before, "…and leaving the run closes it");
+
   // ---- Runs list and theme toggle
   await hash("#/runs");
   await b.waitFor("document.querySelectorAll('.runs-table tbody tr').length >= 2");
