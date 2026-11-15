@@ -659,14 +659,25 @@ class Run {
 
   async confirmIfNeeded() {
     if (this.autonomy !== 'confirm_plan') return;
+    this.throwIfCancelled();
     this.state.status = 'awaiting_confirmation';
-    await this.setPhase('awaiting_confirmation');
-    await new Promise((resolveWait, rejectWait) => {
-      const onAbort = () => { this.confirmResolve = null; rejectWait(new CancelledError(this.cancelReason)); };
-      if (this.signal.aborted) return onAbort();
+    let onAbort;
+    const waiting = new Promise(resolveWait => {
+      onAbort = () => {
+        this.confirmResolve = null;
+        resolveWait();
+      };
+      this.confirmResolve = resolveWait;
       this.signal.addEventListener('abort', onAbort, { once: true });
-      this.confirmResolve = () => { this.signal.removeEventListener('abort', onAbort); resolveWait(); };
     });
+    try {
+      await this.setPhase('awaiting_confirmation');
+      await waiting;
+      this.throwIfCancelled();
+    } finally {
+      this.confirmResolve = null;
+      this.signal.removeEventListener('abort', onAbort);
+    }
     const confirmation = { by: 'user', at: iso(this.nowMs()), specVersion: this.approvedSpecVersion, specSha256: this.approvedSpecSha256 };
     this.state.userConfirmation = confirmation;   // recorded separately: state.approval stays the model's approval
     this.state.status = 'running';
