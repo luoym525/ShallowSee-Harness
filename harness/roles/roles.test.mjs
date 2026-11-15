@@ -80,6 +80,38 @@ test('invalid output is repaired once, text-only JSON is parsed, and exhaustion 
   assert.equal(bad.modelCalls.length, 2);
 });
 
+test('planner retries a token-truncated response once with a larger copy of the same request', async () => {
+  const truncated = { json: { title: 'partial' }, text: '{"title":', stopReason: 'max_tokens' };
+  const ctx = context([truncated, spec]);
+  const output = await planner.run({
+    brief, research: researchResult(brief.researchQuestions[0]), roster: [{ ref: 'fake/mini' }],
+  }, ctx);
+  assert.equal(output.title, spec.title);
+  assert.deepEqual(ctx.modelCalls.map(call => call.maxTokens), [32000, 64000]);
+  assert.deepEqual(ctx.modelCalls[1].messages, ctx.modelCalls[0].messages);
+  assert.equal(ctx.modelCalls[1].responseSchema, ctx.modelCalls[0].responseSchema);
+});
+
+test('a second token stop reports the expanded limit even if a partial artifact parses', async () => {
+  const truncated = { json: brief, stopReason: 'max_tokens' };
+  const ctx = context([truncated, truncated]);
+  await assert.rejects(intake.run({ wish: 'A tip tool' }, ctx), {
+    name: 'RoleError', code: 'invalid_output', message: /output limit.*16000 tokens/,
+  });
+  assert.deepEqual(ctx.modelCalls.map(call => call.maxTokens), [8000, 16000]);
+  assert(ctx.modelCalls.every(call => call.messages.length === 1));
+});
+
+test('schema repair and token expansion each run once and preserve their request context', async () => {
+  const ctx = context([{}, { json: null, text: '{', stopReason: 'max_tokens' }, plan]);
+  assert.deepEqual(await reviewer.reviewPlan.run({
+    brief, research: researchResult(brief.researchQuestions[0]), spec, planCheck: null,
+  }, ctx), plan);
+  assert.deepEqual(ctx.modelCalls.map(call => call.maxTokens), [32000, 32000, 64000]);
+  assert.match(ctx.modelCalls[1].messages[1].content, /failed validation/);
+  assert.deepEqual(ctx.modelCalls[2].messages, ctx.modelCalls[1].messages);
+});
+
 test('model errors and cancellation propagate without a repair', async () => {
   const abort = new AbortController();
   abort.abort(new Error('Stopped'));
