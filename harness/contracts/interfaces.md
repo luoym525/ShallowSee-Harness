@@ -171,7 +171,7 @@ export const planner:    Role<{ brief: Brief; research: Research; roster: Roster
   // RosterSummary = { ref, label, tier, capabilities, inputUsdPerMTok, outputUsdPerMTok }: the models actually configured.
   // The planner picks WorkItem.suggestedModel only from this list; the router validates it in code.
 export const reviewer: {
-  reviewPlan:  Role<{ brief: Brief; research: Research; spec: Spec }, PlanReview>;
+  reviewPlan:  Role<{ brief: Brief; research: Research; spec: Spec; planCheck: FactCheck | null }, PlanReview>;
   reviewFinal: Role<{ brief: Brief; spec: Spec; testReport: TestReport; fileList: string[]; readmeExcerpt: string | null }, FinalReview>;
 };
 export const reflector:  Role<{ spec: Spec; item: WorkItem; attempt: number; build: BuildResult; testReport: TestReport;
@@ -362,17 +362,18 @@ interface Skill<I = unknown, O = unknown> {
   name: string; description: string;                // shown in the UI and usable in prompts
   version: string;                                   // e.g. "1.0.0"
   needs: { search: boolean; llm: boolean };
-  allowedPhases: string[];                           // shelf-life: ["fact_check"]
+  allowedPhases: string[];                           // shelf-life: ["plan_check", "fact_check"]
   inputSchema: object; outputSchema: object;         // JSON Schema (validateJson subset)
   run(input: I, ctx: SkillContext): Promise<O>;
 }
 
 interface SkillContext {
-  llm: RoleContext["llm"];                           // routed by the engine (role "researcher", purpose "fact_check")
+  llm: RoleContext["llm"];                           // routed by the engine (role "researcher", purpose "plan_check" | "fact_check")
   search: SearchClient["search"] | null;             // injected only when the skill declares needs.search
   providerIdentity: { provider: string; model: ModelRef };   // trusted, from the engine's routing; recorded in the skill's events
   childRoom: { rootDir: string; roomId: string; parentRoomId: string };
-                                                     // the skill writes its OWN event log here (roomId = "<runId>-fact-check"),
+                                                     // the skill writes its OWN event log here; roomId is UNIQUE per invocation:
+                                                     // "<runId>-sl-01", "<runId>-sl-02", ... (event logs cannot be reopened),
                                                      // e.g. via packages/shelf-life runDirect; never into the parent run's log
   note(text: string): void;
   signal: AbortSignal;                               // checked before every model/search call and after each one settles

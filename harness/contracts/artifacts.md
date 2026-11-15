@@ -13,7 +13,8 @@ interface RunState {
   title: string | null;                 // from the spec once planned
   status: "running" | "awaiting_confirmation" | RunStatus;   // RunStatus = delivered | partial | failed | cancelled
   phase: "intake" | "research" | "plan" | "plan_review" | "awaiting_confirmation" | "scaffold" | "build" | "test"
-       | "reflect" | "final_test" | "final_review" | "fact_check" | "report" | "done";
+       | "reflect" | "final_test" | "final_review" | "fact_check" | "report" | "done"
+       | "plan_check";                  // between "plan" and "plan_review"
   autonomy: "full" | "confirm_plan";
   approval: { by: "model"; model: ModelRef; at: string; specVersion: number; specSha256: string; reviewRef: string; callId: string }
           | { by: "user"; at: string; specVersion: number; specSha256: string } | null;   // see PlanReview rules
@@ -126,6 +127,7 @@ interface PlanReview {
 ```
 Hard rules (engine):
 - `approve` is only accepted when every score is ≥ 2 and there is no blocker; otherwise it is treated as `revise`.
+- **Plan check:** every `planCheck` finding with verdict `stale` whose `independent_sources` and `correction_supported` checks both passed is an automatic blocker. The engine adds the required change "Update <statement> to <currentValue> (sources: …)" and treats the verdict as `revise`. `unsure` findings are passed to the reviewer as major issues to weigh. A skipped or failed plan check is recorded and does not block (no search configured ≠ wrong plan).
 - **Independence:** the reviewer gets a fresh context (brief, research, spec only: never the planner's messages) and a different model from the planner whenever another tier-3 model is configured (router `avoidModels`). If only one tier-3 model exists, the same model may review, and `harness.plan.reviewed` says `sameModelAsPlanner: true`.
 - **Binding:** the approval in `state.json` is `{ by: "model", model, at, specVersion, specSha256, reviewRef: "plan-review.json", callId }`. Any later spec change (replan) voids it and requires a new review. The approval is never written or shown as a user confirmation; in `confirm_plan` mode the user's confirmation is recorded separately as `{ by: "user", at, specVersion, specSha256 }`.
 
@@ -177,13 +179,17 @@ interface FinalReview {
 }
 ```
 
-## `fact-check.json` — FactCheck (Shelf Life skill, phase `fact_check`)
+## `plan-check-v<N>.json` and `fact-check.json` — FactCheck (Shelf Life skill)
+
+Two uses of the same skill and format, each in its own child room:
+- **`plan_check`** (before plan review, once per spec version): the engine renders `plan-facts-v<N>.md` deterministically from the spec and research (no model): one Markdown line per checkable fact the plan relies on, i.e. each external service and endpoint, runtime and standard versions, documented limits, and every finding with its sources. The skill audits that document, and the result goes to the plan reviewer. This is the "verify the plan is current before development" step (room #216, #247, #268).
+- **`fact_check`** (after final review): audits the delivered product's `README.md`.
 
 ```ts
 interface FactCheck {
   status: "completed" | "skipped" | "failed";
   reason: string | null;                 // why skipped or failed
-  childRoomId: string | null;            // "<runId>-fact-check": the skill's own event log
+  childRoomId: string | null;            // "<runId>-sl-NN": the skill's own event log for this invocation
   doc: { label: string; sha256: string } | null;
   findings: {
     claimId: string; line: number; quote: string; statement: string;

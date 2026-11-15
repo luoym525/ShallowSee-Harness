@@ -43,6 +43,7 @@ HTTP + SSE from the console server (brief 07). Until it exists, run your own tin
 - **Timeline**: a compact event feed with human sentences (from `model.mjs`), expandable details (test evidence, reflections, sources with links).
 - **Plan approval** badge: "Auto-approved by <model>" (never "approved by you" unless `by: "user"`); in confirm mode, a **Confirm plan** button.
 - **Sources** panel (research): domain chips linking to sources.
+- **Plan fact check** card shown before the approval badge (`harness.skill.*` with `phase: "plan_check"`, or `plan-check-v<N>.json`): which plan facts were confirmed current, which were stale and forced a revision, with sources. This is the "verified against live sources before building" moment for the video.
 - **Fact check** card (Shelf Life skill, `harness.skill.*` and `shelflife.*` events or `fact-check.json`): each claim with fresh/stale/unsure, old → proposed value, and two source links; label it "Proposed, unreviewed" and never "Confirmed".
 - When finished: **Open the product** (a new tab at `http://127.0.0.1:4321/<runId>/`, the separate preview origin; never embed it in the console page) for static-web, the rendered REPORT.md (write a tiny safe Markdown renderer: headings, lists, tables, code, links; escape all HTML), and a file browser.
 

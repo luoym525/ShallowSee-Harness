@@ -11,7 +11,8 @@ flowchart TD
     W[Wish typed by the user] --> I[Intake<br/>wish → brief + explicit assumptions]
     I --> R[Research<br/>Linkup live search, cited findings]
     R --> P[Plan<br/>spec: work items + executable acceptance checks]
-    P --> PR{Plan review<br/>independent strong model}
+    P --> PC[Plan check<br/>Shelf Life skill verifies the plan's facts are current, with Linkup]
+    PC --> PR{Plan review<br/>independent strong model}
     PR -->|revise, max 2| P
     PR -->|approve: recorded auto-approval| S[Scaffold<br/>workspace + git + frozen acceptance tests]
     S --> B[Build one work item<br/>cheap coding model, tool loop]
@@ -35,6 +36,7 @@ The engine owns this state machine. Every arrow is code, not a model decision, e
 | `intake` | intake (`roles/`) | 2 | `brief.json` |
 | `research` | researcher (`roles/`) + Linkup | 2 | `research.json` |
 | `plan` | planner (`roles/`) | 3 | `spec.json` |
+| `plan_check` | Shelf Life skill on the engine-rendered `plan-facts-v<N>.md` + Linkup | 2 (role "researcher") | `plan-check-v<N>.json`; confirmed stale facts force a revision |
 | `plan_review` | reviewer (`roles/`) | 3, not the planner's model if another tier-3 model exists | `plan-review.json` |
 | `scaffold` | engine + tester (`workers/tester` materialises acceptance tests) | 2 | workspace commit `scaffold` |
 | `build` | builder (`workers/builder`) | 1 for easy, 2 for medium or hard, +1 tier per failed attempt | git commit per attempt |
