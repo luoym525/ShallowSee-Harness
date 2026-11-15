@@ -208,12 +208,14 @@ interface Workspace {
   writeFile(rel: string, content: string): Promise<{ bytes: number }>;          // creates folders; max 1 MB
   editFile(rel: string, oldText: string, newText: string): Promise<void>;       // oldText must occur exactly once
   listFiles(opts?: { maxEntries?: number }): Promise<string[]>;                 // relative POSIX paths; skips .git and node_modules
-  exec(cmd: "node", args: string[], opts?: { timeoutMs?: number; input?: string; env?: Record<string,string>; signal?: AbortSignal }):
+  exec(cmd: "node", args: string[], opts?: { timeoutMs?: number; input?: string; env?: Record<string,string>; signal?: AbortSignal;
+                                              readOnlyPaths?: string[] }):   // harness-trusted absolute dirs added as extra --allow-fs-read
+                                                                              // (never derived from model output); used for frozen acceptance copies
     Promise<{ exitCode: number | null; stdout: string; stderr: string; timedOut: boolean; cancelled: boolean; durationMs: number }>;
     // no shell; cwd = workspace; scrubbed env (no keys); output truncated to the last 20 KB each; default timeout 60 s.
     // OS boundary: always runs `node --permission --allow-fs-read=<ws> --allow-fs-write=<ws> ...` (see "Sandbox boundary" below).
     // Settles ONLY after the whole process tree has exited, including on timeout and abort.
-  startProcess(cmd: "node", args: string[], opts: { port: number; readyPath?: string; timeoutMs?: number; signal?: AbortSignal }):
+  startProcess(cmd: "node", args: string[], opts: { port: number; readyPath?: string; timeoutMs?: number; signal?: AbortSignal; readOnlyPaths?: string[] }):
     Promise<{ url: string; stop(): Promise<void> }>;        // same permission flags; waits until http://127.0.0.1:<port><readyPath> answers;
                                                             // stop() and abort resolve only after the process tree has exited
   git: {
@@ -233,8 +235,12 @@ export async function executeTool(ws: Workspace, name: string, input: object, op
   // readOnly / denyPaths are TOOL-LEVEL guards on write_file and edit_file only (builder: denyPaths ["acceptance/"]).
   // They are not an OS boundary: code run through run_command can still write anywhere inside the workspace. See below.
   // Resolves only after any process it started has exited.
-export async function sandboxSupport(): Promise<{ ok: boolean; flag: "--permission" | "--experimental-permission" | null; detail: string }>;
+export async function sandboxSupport(): Promise<{ ok: boolean; flag: "--permission" | "--experimental-permission" | null;
+                                                  testIsolationFlag: "--test-isolation=none" | "--experimental-test-isolation=none" | null; detail: string }>;
   // Probes the local Node once (cached). The engine refuses to start a run when ok is false (fail closed).
+  // testIsolationFlag: `node --test` spawns child processes, which the sandbox denies; when args contain "--test" the sandbox inserts
+  // this flag (Node 22.23 on this machine: only "--experimental-test-isolation=none" works; "--test-isolation=none" is "bad option").
+  // If it is null, "--test" commands are refused with command_not_allowed. Never grant --allow-child-process to make tests run.
 export class SandboxError extends Error { code: "path_escape" | "too_large" | "not_found" | "not_unique" | "command_not_allowed" | "timeout" | "cancelled" | "git_failed" | "sandbox_unavailable" }
 ```
 
@@ -245,7 +251,8 @@ export class SandboxError extends Error { code: "path_escape" | "too_large" | "n
 | Model-run code reads keys (`apiConfig.json`, `.env`) or other files outside the workspace | **Blocked by the OS-level Node permission model** | Every child is `node --permission --allow-fs-read=<real workspace path> --allow-fs-write=<real workspace path>`; verified on this machine (Node 22.23.1, Windows): reads and writes outside return `ERR_ACCESS_DENIED` |
 | Keys in environment variables | Blocked | scrubbed environment (allow-list only) |
 | Model-run code spawns an unsandboxed process or worker | Blocked | no `--allow-child-process`, no `--allow-worker` |
-| Model-run code edits `acceptance/` (inside the workspace) | **Not prevented; detected and undone** | tester compares the `acceptance/` tree hash before every run; on mismatch every result fails and the tester restores the frozen tests from the scaffold commit |
+| Model-run code edits the acceptance tests **while they run** | **Blocked** (room #305; verified on Node 22.23: a write to the frozen copy gets `ERR_ACCESS_DENIED`) | the tester runs acceptance scripts from a **frozen copy outside the workspace** (`<runDir>/acceptance-frozen/NNN/`, extracted from the scaffold commit), passed as `readOnlyPaths`; the workspace stays the only writable path |
+| Model-run code edits `acceptance/` inside the workspace between runs | **Detected and undone** (not prevented) | tree-hash check before every run → all results fail + restore from the scaffold commit. A hash check alone only proves the final bytes, which is why execution uses the frozen copy above |
 | Network access | **Not restricted** (products may call key-less public APIs) | documented limitation |
 | CPU and memory | Bounded only by timeouts | documented limitation |
 | Python | **Not supported this sprint** (no equivalent OS boundary here) | `cmd` must be `node`; `python` returns `command_not_allowed` |
